@@ -4,40 +4,26 @@ on:
   workflow_dispatch:
     inputs:
       issue_key:
-        description: 'Jira issue key'
         required: true
         type: string
-      comment:
-        description: 'Comment from Jira'
-        required: false
-        type: string
       attachments:
-        description: 'Attachments in JSON'
         required: true
         type: string
 
 jobs:
-  process_attachments:
+  process:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Setup Groovy
+        uses: wtfjoke/setup-groovy@v1
         with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install Groovy
-        run: |
-          sudo apt update
-          sudo apt install -y groovy
+          groovy-version: '4.0.15'
 
       - name: Run Groovy script
         run: groovy scripts/process_latest_attachments.groovy
         env:
           INPUT_ISSUE_KEY: ${{ github.event.inputs.issue_key }}
-          INPUT_COMMENT: ${{ github.event.inputs.comment }}
           INPUT_ATTACHMENTS: ${{ github.event.inputs.attachments }}
