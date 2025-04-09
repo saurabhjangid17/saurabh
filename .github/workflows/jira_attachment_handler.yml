@@ -1,0 +1,40 @@
+name: Handle Jira Attachments
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: 'Jira issue key'
+        required: true
+        type: string
+      attachments:
+        description: 'JSON string of all attachments'
+        required: true
+        type: string
+
+jobs:
+  process-attachments:
+    runs-on: ubuntu-latest
+
+    env:
+      SERVICENOW_URL: ${{ secrets.SERVICENOW_URL }}
+      SERVICENOW_USER: ${{ secrets.SERVICENOW_USER }}
+      SERVICENOW_PASS: ${{ secrets.SERVICENOW_PASS }}
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Setup Groovy
+        uses: sdkman/sdkman-action@v1
+        with:
+          candidate: groovy
+          version: '4.0.6'
+
+      - name: Save input files
+        run: |
+          echo '${{ github.event.inputs.issue_key }}' > issue_key.txt
+          echo '${{ github.event.inputs.attachments }}' > attachments.json
+
+      - name: Run Groovy Script
+        run: groovy scripts/process_latest_attachments.groovy
