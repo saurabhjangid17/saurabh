@@ -53,4 +53,11 @@ latestAttachments.each { att ->
     def connection = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
     connection.setRequestMethod("POST")
     connection.setDoOutput(true)
-    connection.setRequest
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.outputStream.withWriter("UTF-8") { writer ->
+        writer << gson.toJson(payload)
+    }
+
+    def responseCode = connection.responseCode
+    println "Response for ${att.filename}: $responseCode"
+}
