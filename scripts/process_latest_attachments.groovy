@@ -40,43 +40,48 @@ attachments.sort { a, b ->
     ZonedDateTime.parse(b.created, formatter) <=> ZonedDateTime.parse(a.created, formatter)
 }
 
-// Get latest minute-level timestamp
-def latestTimestamp = ZonedDateTime.parse(attachments[0].created, formatter)
-def latestMinute = latestTimestamp.truncatedTo(ChronoUnit.MINUTES)
-
-println "📆 Matching all attachments created at: ${latestMinute} (ignoring seconds/millis)"
-
+// Group by latest minute
+def latestTimestamp = ZonedDateTime.parse(attachments[0].created, formatter).truncatedTo(ChronoUnit.MINUTES)
 def latestAttachments = attachments.findAll {
-    def attachmentTime = ZonedDateTime.parse(it.created, formatter).truncatedTo(ChronoUnit.MINUTES)
-    attachmentTime.isEqual(latestMinute)
+    ZonedDateTime.parse(it.created, formatter).truncatedTo(ChronoUnit.MINUTES).isEqual(latestTimestamp)
 }
 
-println "📦 Found ${latestAttachments.size()} attachment(s) in the latest minute group."
+println "📦 Found ${latestAttachments.size()} attachment(s) created at ${latestTimestamp}"
 
-latestAttachments.each { att ->
-    def payload = [
-        issueKey : issueKey,
+// Build the payload
+def attachmentArray = latestAttachments.collect { att ->
+    [
+        id       : att.id,
         filename : att.filename,
         mimeType : att.mimeType,
         content  : att.content,
         created  : att.created
     ]
+}
 
-    println "\n🚀 Sending attachment to webhook:"
-    println gson.toJson(payload)
+def payload = [
+    event: "attachment_added",
+    key  : issueKey,
+    fields: [
+        attachment         : attachmentArray,
+        customfield_10511  : ""
+    ]
+]
 
-    try {
-        def connection = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
-        connection.setRequestMethod("POST")
-        connection.setDoOutput(true)
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.outputStream.withWriter("UTF-8") { writer ->
-            writer << gson.toJson(payload)
-        }
+println "\n🚀 Sending payload to webhook:"
+println gson.toJson(payload)
 
-        def responseCode = connection.responseCode
-        println "✅ Webhook responded with HTTP ${responseCode}"
-    } catch (Exception ex) {
-        println "❌ Error sending attachment to webhook: ${ex.message}"
+try {
+    def connection = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
+    connection.setRequestMethod("POST")
+    connection.setDoOutput(true)
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.outputStream.withWriter("UTF-8") { writer ->
+        writer << gson.toJson(payload)
     }
+
+    def responseCode = connection.responseCode
+    println "✅ Webhook responded with HTTP ${responseCode}"
+} catch (Exception ex) {
+    println "❌ Error sending to webhook: ${ex.message}"
 }
