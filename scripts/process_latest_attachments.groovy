@@ -1,62 +1,82 @@
-@Grab(group='com.google.code.gson', module='gson', version='2.8.9')
+@Grab('com.google.code.gson:gson:2.8.6')
 import com.google.gson.*
+import com.google.gson.reflect.TypeToken
 import java.time.*
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
+def json = System.getenv("INPUT_ATTACHMENTS")
 def issueKey = System.getenv("INPUT_ISSUE_KEY")
-def comment = System.getenv("INPUT_COMMENT")
-def attachmentJson = System.getenv("INPUT_ATTACHMENTS")
 
 println "🔹 INPUT_ISSUE_KEY: ${issueKey}"
-println "🔹 INPUT_COMMENT: ${comment}"
-println "🔹 Raw INPUT_ATTACHMENTS JSON:\n${attachmentJson}"
+println "🔹 Raw INPUT_ATTACHMENTS JSON:\n${json}"
 
-if (!attachmentJson) {
+if (json == null || json.trim().isEmpty()) {
     println "❌ No attachment JSON provided."
-    System.exit(1)
+    return
 }
 
 def gson = new Gson()
-def allAttachments = gson.fromJson(attachmentJson, List)
+def type = new TypeToken<List<Map>>() {}.getType()
 
-def normalizeToMinute = { String ts ->
-    // Remove milliseconds and normalize timezone
-    def clean = ts.replace("+0000", "+00:00")
-    def instant = OffsetDateTime.parse(clean)
-    return instant.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))
+List<Map> attachments = []
+try {
+    attachments = gson.fromJson(json, type)
+    println "✅ Parsed ${attachments.size()} attachments."
+} catch (Exception e) {
+    println "❌ Failed to parse attachments JSON: ${e.message}"
+    return
 }
 
-// Get the most recent timestamp (to the minute)
-def recentTime = allAttachments.collect {
-    normalizeToMinute(it.created)
-}.max()
-
-def recentAttachments = allAttachments.findAll {
-    normalizeToMinute(it.created) == recentTime
+if (!attachments || attachments.isEmpty()) {
+    println "❌ No attachments found for issue: $issueKey"
+    return
 }
 
-def finalPayload = [
-  event: "attachment_added",
-  key: issueKey,
-  fields: [
-    comment: comment,
-    attachment: recentAttachments
-  ]
-]
+def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SX")
 
-def payloadJson = gson.toJson(finalPayload)
-println "📦 Final Payload:\n${payloadJson}"
+// Sort by newest
+attachments.sort { a, b ->
+    ZonedDateTime.parse(b.created, formatter) <=> ZonedDateTime.parse(a.created, formatter)
+}
 
-// 🔔 OPTIONAL: send to webhook
-def webhookUrl = "https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1"
-def url = new URL(webhookUrl)
-def conn = url.openConnection()
-conn.setRequestMethod("POST")
-conn.setDoOutput(true)
-conn.setRequestProperty("Content-Type", "application/json")
+// Get latest minute-level timestamp
+def latestTimestamp = ZonedDateTime.parse(attachments[0].created, formatter)
+def latestMinute = latestTimestamp.truncatedTo(ChronoUnit.MINUTES)
 
-conn.outputStream.withWriter("UTF-8") { it.write(payloadJson) }
+println "📆 Matching all attachments created at: ${latestMinute} (ignoring seconds/millis)"
 
-def responseCode = conn.responseCode
-println "✅ Sent payload to webhook. Response Code: ${responseCode}"
-println conn.inputStream.text
+def latestAttachments = attachments.findAll {
+    def attachmentTime = ZonedDateTime.parse(it.created, formatter).truncatedTo(ChronoUnit.MINUTES)
+    attachmentTime.isEqual(latestMinute)
+}
+
+println "📦 Found ${latestAttachments.size()} attachment(s) in the latest minute group."
+
+latestAttachments.each { att ->
+    def payload = [
+        issueKey : issueKey,
+        filename : att.filename,
+        mimeType : att.mimeType,
+        content  : att.content,
+        created  : att.created
+    ]
+
+    println "\n🚀 Sending attachment to webhook:"
+    println gson.toJson(payload)
+
+    try {
+        def connection = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
+        connection.setRequestMethod("POST")
+        connection.setDoOutput(true)
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.outputStream.withWriter("UTF-8") { writer ->
+            writer << gson.toJson(payload)
+        }
+
+        def responseCode = connection.responseCode
+        println "✅ Webhook responded with HTTP ${responseCode}"
+    } catch (Exception ex) {
+        println "❌ Error sending attachment to webhook: ${ex.message}"
+    }
+}
