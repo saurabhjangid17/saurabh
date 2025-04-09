@@ -1,43 +1,49 @@
-import groovy.json.*
+@Grab('com.google.code.gson:gson:2.8.6')
+import com.google.gson.*
+import java.time.*
+import java.time.format.DateTimeFormatter
 
-// Load input values
-def issueKey = new File("issue_key.txt").text.trim()
-def attachmentsFile = new File("attachments.json")
-def attachments = new JsonSlurper().parseText(attachmentsFile.text)
+def json = System.getenv("INPUT_ATTACHMENTS")
+def issueKey = System.getenv("INPUT_ISSUE_KEY")
 
-if (!attachments || attachments.isEmpty()) {
-    println "❌ No attachments found in input"
-    System.exit(0)
+def gson = new Gson()
+def attachments = gson.fromJson(json, List)
+
+if (attachments == null || attachments.isEmpty()) {
+    println "No attachments found for issue: $issueKey"
+    return
 }
 
-// Step 1: Get the latest 'created' timestamp
-def latestTime = attachments*.created.max()
-println "✅ Latest attachment timestamp: $latestTime"
+// Parse and sort by creation time
+def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SX")
 
-// Step 2: Get all attachments with that timestamp
-def latestAttachments = attachments.findAll { it.created == latestTime }
+attachments.sort { a, b ->
+    ZonedDateTime.parse(b.created, formatter) <=> ZonedDateTime.parse(a.created, formatter)
+}
 
-println "📎 Found ${latestAttachments.size()} new attachment(s)"
+// Get the most recent ones (could be more than one if timestamps are equal)
+def latestTime = ZonedDateTime.parse(attachments[0].created, formatter)
+def recentAttachments = attachments.findAll {
+    ZonedDateTime.parse(it.created, formatter).isEqual(latestTime)
+}
 
-// Step 3: Send to dummy webhook
-latestAttachments.each { att ->
+// Send all recent attachments to webhook
+recentAttachments.each {
     def payload = [
         issueKey: issueKey,
-        filename: att.filename,
-        mimeType: att.mimeType,
-        content: att.content,
-        created: att.created
+        filename: it.filename,
+        mimeType: it.mimeType,
+        content: it.content,
+        created: it.created
     ]
 
-    def webhookUrl = 'https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1'
-    def connection = new URL(webhookUrl).openConnection()
-    connection.setRequestMethod("POST")
-    connection.setRequestProperty("Content-Type", "application/json")
-    connection.doOutput = true
+    def post = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
+    post.setRequestMethod("POST")
+    post.setDoOutput(true)
+    post.setRequestProperty("Content-Type", "application/json")
+    post.outputStream.withWriter { writer ->
+        writer << gson.toJson(payload)
+    }
 
-    def json = JsonOutput.toJson(payload)
-    connection.outputStream.withWriter("UTF-8") { it.write(json) }
-
-    def responseCode = connection.responseCode
-    println "📤 Sent ${att.filename} to webhook. Response: $responseCode"
+    println "Sent attachment: ${it.filename}"
 }
