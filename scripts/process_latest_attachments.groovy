@@ -1,87 +1,73 @@
-@Grab('com.google.code.gson:gson:2.8.6')
+@Grab(group='com.google.code.gson', module='gson', version='2.10.1')
 import com.google.gson.*
-import com.google.gson.reflect.TypeToken
 import java.time.*
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 
-def json = System.getenv("INPUT_ATTACHMENTS")
 def issueKey = System.getenv("INPUT_ISSUE_KEY")
+def comment = System.getenv("INPUT_COMMENT")
+def customField = System.getenv("INPUT_CUSTOMFIELD_10511")
+def attachmentsJson = System.getenv("INPUT_ATTACHMENTS")
+def webhookUrl = System.getenv("WEBHOOK_URL")
 
-println "🔹 INPUT_ISSUE_KEY: ${issueKey}"
-println "🔹 Raw INPUT_ATTACHMENTS JSON:\n${json}"
+println "🔹 Issue Key: ${issueKey}"
+println "🔹 Comment: ${comment}"
+println "🔹 Custom Field: ${customField}"
+println "🔹 Raw Attachments JSON: ${attachmentsJson}"
 
-if (json == null || json.trim().isEmpty()) {
+if (!attachmentsJson) {
     println "❌ No attachment JSON provided."
-    return
+    System.exit(1)
 }
 
 def gson = new Gson()
-def type = new TypeToken<List<Map>>() {}.getType()
+def allAttachments = gson.fromJson(attachmentsJson, List)
 
-List<Map> attachments = []
-try {
-    attachments = gson.fromJson(json, type)
-    println "✅ Parsed ${attachments.size()} attachments."
-} catch (Exception e) {
-    println "❌ Failed to parse attachments JSON: ${e.message}"
-    return
+if (!allAttachments || allAttachments.isEmpty()) {
+    println "❌ No valid attachments found."
+    System.exit(1)
 }
 
-if (!attachments || attachments.isEmpty()) {
-    println "❌ No attachments found for issue: $issueKey"
-    return
+// Extract latest timestamp up to minutes
+def latestTimestamp = allAttachments
+    .collect { it.created }
+    .max()
+    .substring(0, 16)
+
+def latestAttachments = allAttachments.findAll {
+    it.created.startsWith(latestTimestamp)
 }
 
-def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SX")
-
-// Sort by newest
-attachments.sort { a, b ->
-    ZonedDateTime.parse(b.created, formatter) <=> ZonedDateTime.parse(a.created, formatter)
-}
-
-// Group by latest minute
-def latestTimestamp = ZonedDateTime.parse(attachments[0].created, formatter).truncatedTo(ChronoUnit.MINUTES)
-def latestAttachments = attachments.findAll {
-    ZonedDateTime.parse(it.created, formatter).truncatedTo(ChronoUnit.MINUTES).isEqual(latestTimestamp)
-}
-
-println "📦 Found ${latestAttachments.size()} attachment(s) created at ${latestTimestamp}"
-
-// Build the payload
-def attachmentArray = latestAttachments.collect { att ->
-    [
-        id       : att.id,
-        filename : att.filename,
-        mimeType : att.mimeType,
-        content  : att.content,
-        created  : att.created
-    ]
-}
+println "✅ Latest attachments (${latestAttachments.size()}):"
+latestAttachments.each { println "- ${it.filename}" }
 
 def payload = [
     event: "attachment_added",
-    key  : issueKey,
+    key: issueKey,
     fields: [
-        attachment         : attachmentArray,
-        customfield_10511  : ""
+        comment: comment ?: "",
+        attachment: latestAttachments,
+        customfield_10208: customField ?: ""
     ]
 ]
 
-println "\n🚀 Sending payload to webhook:"
-println gson.toJson(payload)
+def jsonPayload = gson.toJson(payload)
+println "📦 Final Payload:\n${jsonPayload}"
 
-try {
-    def connection = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
-    connection.setRequestMethod("POST")
-    connection.setDoOutput(true)
-    connection.setRequestProperty("Content-Type", "application/json")
-    connection.outputStream.withWriter("UTF-8") { writer ->
-        writer << gson.toJson(payload)
-    }
+// Send to webhook
+def url = new URL(webhookUrl)
+def connection = url.openConnection()
+connection.setRequestMethod("POST")
+connection.setRequestProperty("Content-Type", "application/json")
+connection.setDoOutput(true)
 
-    def responseCode = connection.responseCode
-    println "✅ Webhook responded with HTTP ${responseCode}"
-} catch (Exception ex) {
-    println "❌ Error sending to webhook: ${ex.message}"
+connection.outputStream.withWriter("UTF-8") { writer ->
+    writer.write(jsonPayload)
+}
+
+def responseCode = connection.getResponseCode()
+println "📨 Webhook response: ${responseCode} ${connection.getResponseMessage()}"
+
+if (responseCode >= 400) {
+    println "❌ Error sending payload: ${connection.errorStream.text}"
+    System.exit(1)
 }
