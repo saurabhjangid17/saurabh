@@ -1,8 +1,4 @@
-@Grab(group='org.codehaus.groovy.modules.http-builder', module='http-builder', version='0.7.1')
-
 import groovy.json.*
-import groovyx.net.http.RESTClient
-import static groovyx.net.http.ContentType.JSON
 
 // Load input values
 def issueKey = new File("issue_key.txt").text.trim()
@@ -18,12 +14,12 @@ if (!attachments || attachments.isEmpty()) {
 def latestTime = attachments*.created.max()
 println "✅ Latest attachment timestamp: $latestTime"
 
-// Step 2: Get all attachments with that exact timestamp
+// Step 2: Get all attachments with that timestamp
 def latestAttachments = attachments.findAll { it.created == latestTime }
 
 println "📎 Found ${latestAttachments.size()} new attachment(s)"
 
-// Step 3: Send each to ServiceNow
+// Step 3: Send to dummy webhook
 latestAttachments.each { att ->
     def payload = [
         issueKey: issueKey,
@@ -33,19 +29,15 @@ latestAttachments.each { att ->
         created: att.created
     ]
 
-    println "📤 Sending attachment: ${att.filename}"
+    def webhookUrl = 'https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1'
+    def connection = new URL(webhookUrl).openConnection()
+    connection.setRequestMethod("POST")
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.doOutput = true
 
-    def client = new RESTClient(System.getenv("SERVICENOW_URL"))
-    client.auth.basic System.getenv("SERVICENOW_USER"), System.getenv("SERVICENOW_PASS")
+    def json = JsonOutput.toJson(payload)
+    connection.outputStream.withWriter("UTF-8") { it.write(json) }
 
-    try {
-        def resp = client.post(
-            path: "/api/now/table/incident", // change this to your correct SN endpoint
-            body: JsonOutput.toJson(payload),
-            requestContentType: JSON
-        )
-        println "✅ Uploaded to ServiceNow: ${att.filename} (status: ${resp.status})"
-    } catch (Exception e) {
-        println "❌ Failed to send ${att.filename} - ${e.message}"
-    }
+    def responseCode = connection.responseCode
+    println "📤 Sent ${att.filename} to webhook. Response: $responseCode"
 }
