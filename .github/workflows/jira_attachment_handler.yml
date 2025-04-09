@@ -1,42 +1,19 @@
-name: Handle Jira Attachments
-
 on:
   workflow_dispatch:
     inputs:
       issue_key:
         description: 'Jira Issue Key'
         required: true
+        type: string
       comment:
-        description: 'Comment body'
+        description: 'Comment from Jira'
         required: false
-      customfield_10511:
-        description: 'Custom field'
+        type: string
+      customfield_10208:
+        description: 'Custom Field from Jira'
         required: false
+        type: string
       attachments:
         description: 'List of attachments'
-        required: false
-
-jobs:
-  process_attachments:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Set up Java & Groovy
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install Groovy
-        run: sudo apt-get install -y groovy
-
-      - name: Run Groovy Script
-        run: groovy scripts/process_latest_attachments.groovy
-        env:
-          INPUT_ISSUE_KEY: ${{ github.event.inputs.issue_key }}
-          INPUT_COMMENT: ${{ github.event.inputs.comment }}
-          INPUT_CUSTOMFIELD_10511: ${{ github.event.inputs.customfield_10511 }}
-          INPUT_ATTACHMENTS: ${{ github.event.inputs.attachments }}
-          WEBHOOK_URL: https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1
+        required: true
+        type: string
