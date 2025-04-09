@@ -1,73 +1,54 @@
-@Grab(group='com.google.code.gson', module='gson', version='2.10.1')
+@Grab(group='com.google.code.gson', module='gson', version='2.8.9')
 import com.google.gson.*
 import java.time.*
 import java.time.format.DateTimeFormatter
 
 def issueKey = System.getenv("INPUT_ISSUE_KEY")
 def comment = System.getenv("INPUT_COMMENT")
-def customField = System.getenv("INPUT_CUSTOMFIELD_10511")
-def attachmentsJson = System.getenv("INPUT_ATTACHMENTS")
-def webhookUrl = System.getenv("WEBHOOK_URL")
+def attachmentJson = System.getenv("INPUT_ATTACHMENTS")
 
-println "🔹 Issue Key: ${issueKey}"
-println "🔹 Comment: ${comment}"
-println "🔹 Custom Field: ${customField}"
-println "🔹 Raw Attachments JSON: ${attachmentsJson}"
+println "🔹 INPUT_ISSUE_KEY: ${issueKey}"
+println "🔹 INPUT_COMMENT: ${comment}"
+println "🔹 Raw INPUT_ATTACHMENTS JSON:\n${attachmentJson}"
 
-if (!attachmentsJson) {
+if (!attachmentJson) {
     println "❌ No attachment JSON provided."
     System.exit(1)
 }
 
 def gson = new Gson()
-def allAttachments = gson.fromJson(attachmentsJson, List)
+def allAttachments = gson.fromJson(attachmentJson, List)
 
-if (!allAttachments || allAttachments.isEmpty()) {
-    println "❌ No valid attachments found."
-    System.exit(1)
+def recentTime = allAttachments.max { 
+    ZonedDateTime.parse(it.created) 
+}?.created?.substring(0,16)
+
+def recentAttachments = allAttachments.findAll {
+    it.created?.startsWith(recentTime)
 }
 
-// Extract latest timestamp up to minutes
-def latestTimestamp = allAttachments
-    .collect { it.created }
-    .max()
-    .substring(0, 16)
-
-def latestAttachments = allAttachments.findAll {
-    it.created.startsWith(latestTimestamp)
-}
-
-println "✅ Latest attachments (${latestAttachments.size()}):"
-latestAttachments.each { println "- ${it.filename}" }
-
-def payload = [
-    event: "attachment_added",
-    key: issueKey,
-    fields: [
-        comment: comment ?: "",
-        attachment: latestAttachments,
-        customfield_10208: customField ?: ""
-    ]
+def finalPayload = [
+  event: "attachment_added",
+  key: issueKey,
+  fields: [
+    comment: comment,
+    attachment: recentAttachments
+  ]
 ]
 
-def jsonPayload = gson.toJson(payload)
-println "📦 Final Payload:\n${jsonPayload}"
+def webhookUrl = "https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1"
 
-// Send to webhook
+def payloadJson = gson.toJson(finalPayload)
+println "📦 Final Payload:\n${payloadJson}"
+
 def url = new URL(webhookUrl)
-def connection = url.openConnection()
-connection.setRequestMethod("POST")
-connection.setRequestProperty("Content-Type", "application/json")
-connection.setDoOutput(true)
+def conn = url.openConnection()
+conn.setRequestMethod("POST")
+conn.setDoOutput(true)
+conn.setRequestProperty("Content-Type", "application/json")
 
-connection.outputStream.withWriter("UTF-8") { writer ->
-    writer.write(jsonPayload)
-}
+conn.outputStream.withWriter("UTF-8") { it.write(payloadJson) }
 
-def responseCode = connection.getResponseCode()
-println "📨 Webhook response: ${responseCode} ${connection.getResponseMessage()}"
-
-if (responseCode >= 400) {
-    println "❌ Error sending payload: ${connection.errorStream.text}"
-    System.exit(1)
-}
+def responseCode = conn.responseCode
+println "✅ Sent payload to webhook. Response Code: ${responseCode}"
+println conn.inputStream.text
