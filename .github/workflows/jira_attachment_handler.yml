@@ -19,6 +19,7 @@ on:
 jobs:
   process_attachments:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,6 +29,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Install Groovy
+        run: |
+          sudo apt update
+          sudo apt install -y groovy
 
       - name: Run Groovy script
         run: groovy scripts/process_latest_attachments.groovy
