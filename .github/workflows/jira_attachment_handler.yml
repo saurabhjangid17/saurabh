@@ -14,22 +14,16 @@ jobs:
   process:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
+      - name: Setup Groovy
+        uses: wtfjoke/setup-groovy@v1
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          groovy-version: '4.0.15'
 
-      - name: Install Groovy
-        run: sudo apt-get install -y groovy
-
-      - name: Save inputs
-        run: |
-          echo "${{ github.event.inputs.issue_key }}" > issue_key.txt
-          echo '${{ github.event.inputs.attachments }}' > attachments.json
-
-      - name: Run Groovy Script
+      - name: Run Groovy script
         run: groovy scripts/process_latest_attachments.groovy
+        env:
+          INPUT_ISSUE_KEY: ${{ github.event.inputs.issue_key }}
+          INPUT_ATTACHMENTS: ${{ github.event.inputs.attachments }}
