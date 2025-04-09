@@ -1,3 +1,5 @@
+name: Handle Jira Attachments
+
 on:
   workflow_dispatch:
     inputs:
@@ -6,14 +8,31 @@ on:
         required: true
         type: string
       comment:
-        description: 'Comment from Jira'
-        required: false
-        type: string
-      customfield_10208:
-        description: 'Custom Field from Jira'
+        description: 'Comment body from Jira'
         required: false
         type: string
       attachments:
-        description: 'List of attachments'
+        description: 'Attachment JSON string'
         required: true
         type: string
+
+jobs:
+  process_attachments:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Run Groovy script
+        run: groovy scripts/process_latest_attachments.groovy
+        env:
+          INPUT_ISSUE_KEY: ${{ inputs.issue_key }}
+          INPUT_COMMENT: ${{ inputs.comment }}
+          INPUT_ATTACHMENTS: ${{ inputs.attachments }}
