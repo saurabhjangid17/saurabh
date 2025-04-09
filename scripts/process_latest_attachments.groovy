@@ -3,6 +3,7 @@ import com.google.gson.*
 import com.google.gson.reflect.TypeToken
 import java.time.*
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 def json = System.getenv("INPUT_ATTACHMENTS")
 def issueKey = System.getenv("INPUT_ISSUE_KEY")
@@ -34,18 +35,23 @@ if (!attachments || attachments.isEmpty()) {
 
 def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SX")
 
-// Sort by latest timestamp
+// Sort by newest
 attachments.sort { a, b ->
     ZonedDateTime.parse(b.created, formatter) <=> ZonedDateTime.parse(a.created, formatter)
 }
 
+// Get latest minute-level timestamp
 def latestTimestamp = ZonedDateTime.parse(attachments[0].created, formatter)
+def latestMinute = latestTimestamp.truncatedTo(ChronoUnit.MINUTES)
+
+println "📆 Matching all attachments created at: ${latestMinute} (ignoring seconds/millis)"
 
 def latestAttachments = attachments.findAll {
-    ZonedDateTime.parse(it.created, formatter).isEqual(latestTimestamp)
+    def attachmentTime = ZonedDateTime.parse(it.created, formatter).truncatedTo(ChronoUnit.MINUTES)
+    attachmentTime.isEqual(latestMinute)
 }
 
-println "📦 Found ${latestAttachments.size()} attachment(s) with latest timestamp: $latestTimestamp"
+println "📦 Found ${latestAttachments.size()} attachment(s) in the latest minute group."
 
 latestAttachments.each { att ->
     def payload = [
