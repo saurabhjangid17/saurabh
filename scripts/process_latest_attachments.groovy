@@ -19,15 +19,20 @@ if (!attachmentJson) {
 def gson = new Gson()
 def allAttachments = gson.fromJson(attachmentJson, List)
 
-def formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss[.S][.SS][.SSS]Z")
+def normalizeToMinute = { String ts ->
+    // Remove milliseconds and normalize timezone
+    def clean = ts.replace("+0000", "+00:00")
+    def instant = OffsetDateTime.parse(clean)
+    return instant.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))
+}
 
-// Parse all attachments with safe date format handling
-allAttachments.each { it.createdParsed = ZonedDateTime.parse(it.created.replace("+0000", "+00:00"), formatter) }
-
-def latestTime = allAttachments.max { it.createdParsed }.createdParsed.truncatedTo(ChronoUnit.MINUTES)
+// Get the most recent timestamp (to the minute)
+def recentTime = allAttachments.collect {
+    normalizeToMinute(it.created)
+}.max()
 
 def recentAttachments = allAttachments.findAll {
-    it.createdParsed.truncatedTo(ChronoUnit.MINUTES) == latestTime
+    normalizeToMinute(it.created) == recentTime
 }
 
 def finalPayload = [
@@ -39,11 +44,11 @@ def finalPayload = [
   ]
 ]
 
-def webhookUrl = "https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1"
 def payloadJson = gson.toJson(finalPayload)
-
 println "📦 Final Payload:\n${payloadJson}"
 
+// 🔔 OPTIONAL: send to webhook
+def webhookUrl = "https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1"
 def url = new URL(webhookUrl)
 def conn = url.openConnection()
 conn.setRequestMethod("POST")
