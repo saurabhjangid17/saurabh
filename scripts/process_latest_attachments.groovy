@@ -46,7 +46,7 @@ def payload = [
     fields: [
         comment: comment ?: "",
         attachment: latestAttachments,
-        customfield_10511: customField ?: ""
+        customfield_10208: customField ?: ""
     ]
 ]
 
