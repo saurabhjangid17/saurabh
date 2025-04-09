@@ -1,0 +1,35 @@
+name: Handle Jira Attachments
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        required: true
+        type: string
+      attachments:
+        required: true
+        type: string
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Groovy
+        run: sudo apt-get install -y groovy
+
+      - name: Save inputs
+        run: |
+          echo "${{ github.event.inputs.issue_key }}" > issue_key.txt
+          echo '${{ github.event.inputs.attachments }}' > attachments.json
+
+      - name: Run Groovy Script
+        run: groovy scripts/process_latest_attachments.groovy
