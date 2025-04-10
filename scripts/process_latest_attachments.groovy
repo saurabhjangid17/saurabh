@@ -7,8 +7,10 @@ import java.time.temporal.ChronoUnit
 
 def json = System.getenv("INPUT_ATTACHMENTS")
 def issueKey = System.getenv("INPUT_ISSUE_KEY")
+def issueType = System.getenv("INPUT_ISSUETYPE")
 
 println "🔹 INPUT_ISSUE_KEY: ${issueKey}"
+println "🧾 INPUT_ISSUETYPE: ${issueType}"
 println "🔹 Raw INPUT_ATTACHMENTS JSON:\n${json}"
 
 if (json == null || json.trim().isEmpty()) {
@@ -74,9 +76,16 @@ def finalPayload = [
 println "\n🚀 Final webhook payload:"
 println gson.toJson(finalPayload)
 
-// Send payload to webhook
+// Determine webhook URL based on issue type
+def webhookUrl = issueType == "Incident"
+    ? "https://webhook-test.com/59c5e24d727e72eb99dce94f458ab103"
+    : "https://webhook.site/131b00c0-70fd-45aa-994e-3889be371724"
+
+println "📡 Sending payload to: ${webhookUrl}"
+
+// Send payload to selected webhook
 try {
-    def connection = new URL("https://webhook-test.com/322cb6f50793b78c66e6facd5432a6f1").openConnection()
+    def connection = new URL(webhookUrl).openConnection()
     connection.setRequestMethod("POST")
     connection.setDoOutput(true)
     connection.setRequestProperty("Content-Type", "application/json")
