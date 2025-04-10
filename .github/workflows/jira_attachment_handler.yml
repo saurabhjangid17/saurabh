@@ -9,6 +9,9 @@ on:
       attachments:
         required: true
         type: string
+      issuetype:
+        required: true
+        type: string
 
 jobs:
   process:
@@ -27,3 +30,4 @@ jobs:
         env:
           INPUT_ISSUE_KEY: ${{ github.event.inputs.issue_key }}
           INPUT_ATTACHMENTS: ${{ github.event.inputs.attachments }}
+          INPUT_ISSUETYPE: ${{ github.event.inputs.issuetype }}
