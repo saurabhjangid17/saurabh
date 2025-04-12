@@ -1,0 +1,24 @@
+name: Jira Issue Handler
+
+on:
+  repository_dispatch:
+    types: [jira_issue_created]
+
+jobs:
+  handle-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Save Payload
+        run: echo '${{ toJson(github.event.client_payload) }}' > payload.json
+
+      - name: Run Groovy Script
+        run: groovy handle_issue.groovy payload.json
