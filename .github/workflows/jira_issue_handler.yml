@@ -24,4 +24,4 @@ jobs:
           sudo apt install -y groovy
 
       - name: Run Groovy Script
-        run: groovy handle_issue.groovy payload.json
+        run: groovy scripts/handle_issue.groovy payload.json
