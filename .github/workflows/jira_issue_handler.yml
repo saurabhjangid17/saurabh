@@ -1,15 +1,21 @@
-name: Jira Issue Handler
+name: Handle Jira Issue
 
 on:
-  repository_dispatch:
-    types: [jira_issue_created]
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: 'Jira Issue Key'
+        required: true
+      jira_auth:
+        description: 'Base64 Encoded Jira Auth'
+        required: true
 
 jobs:
-  run-issue-handler:
+  handle-issue:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v3
 
       - name: Set up Java (required for Groovy)
@@ -22,6 +28,16 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y groovy
+
+      - name: Create payload.json from Jira inputs
+        run: |
+          echo '{
+            "issue_key": "${{ github.event.inputs.issue_key }}",
+            "jira_auth": "${{ github.event.inputs.jira_auth }}"
+          }' > payload.json
+
+      - name: Show payload.json (optional for debug)
+        run: cat payload.json
 
       - name: Run Groovy Script
         run: groovy scripts/handle_issue.groovy payload.json
