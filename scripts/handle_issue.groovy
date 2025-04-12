@@ -7,8 +7,8 @@ def issueKey = payload.issue_key
 def jiraAuth = payload.jira_auth
 
 def JIRA_BASE_URL = 'https://atcisaurabhdemo.atlassian.net'
-def SERVICENOW_INCIDENT_URL = 'https://servicenow.example.com/api/incidents'
-def SERVICENOW_REQUEST_URL = 'https://servicenow.example.com/api/requests'
+def SERVICENOW_INCIDENT_URL = 'https://webhook-test.com/d9e68fb04aeeb7be5e0454b17db6612d'
+def SERVICENOW_REQUEST_URL = 'https://webhook.site/ce4db067-719c-4aab-a833-d71c330f41d6'
 
 // Step 1: Fetch issue data from Jira
 def jiraUrl = "$JIRA_BASE_URL/rest/api/3/issue/$issueKey"
