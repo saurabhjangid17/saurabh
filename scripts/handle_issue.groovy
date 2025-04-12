@@ -1,37 +1,43 @@
-import groovy.json.JsonSlurper
-import groovy.json.JsonOutput
+name: Handle Jira Issue
 
-// Read the input payload
-def payload = new JsonSlurper().parse(new File(args[0]))
-def issueKey = payload.issue_key
-def jiraAuth = payload.jira_auth
+on:
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: 'Jira Issue Key'
+        required: true
+      jira_auth:
+        description: 'Base64 Encoded Jira Auth'
+        required: true
 
-def JIRA_BASE_URL = 'https://atcisaurabhdemo.atlassian.net'
-def SERVICENOW_INCIDENT_URL = 'https://webhook-test.com/d9e68fb04aeeb7be5e0454b17db6612d'
-def SERVICENOW_REQUEST_URL = 'https://webhook.site/ce4db067-719c-4aab-a833-d71c330f41d6'
+jobs:
+  handle-issue:
+    runs-on: ubuntu-latest
 
-// Step 1: Fetch issue data from Jira
-def jiraUrl = "$JIRA_BASE_URL/rest/api/3/issue/$issueKey"
-def jiraConn = new URL(jiraUrl).openConnection()
-jiraConn.setRequestProperty("Authorization", jiraAuth)
-jiraConn.setRequestProperty("Accept", "application/json")
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-def issueData = new JsonSlurper().parse(jiraConn.inputStream)
+      - name: Set up Java (required for Groovy)
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-// Step 2: Determine target URL based on issue type
-def issueType = issueData.fields.issuetype.name
-def targetUrl = issueType == "Incident" ? SERVICENOW_INCIDENT_URL : SERVICENOW_REQUEST_URL
+      - name: Install Groovy
+        run: |
+          sudo apt update
+          sudo apt install -y groovy
 
-println "Issue [$issueKey] type is [$issueType] → Sending to [$targetUrl]"
+      - name: Create payload.json from Jira inputs
+        run: |
+          echo '{
+            "issue_key": "${{ github.event.inputs.issue_key }}",
+            "jira_auth": "${{ github.event.inputs.jira_auth }}"
+          }' > payload.json
 
-// Step 3: Send the issue data to ServiceNow
-def conn = new URL(targetUrl).openConnection()
-conn.setRequestMethod("POST")
-conn.doOutput = true
-conn.setRequestProperty("Content-Type", "application/json")
+      - name: Show payload.json (optional for debug)
+        run: cat payload.json
 
-def body = JsonOutput.toJson(issueData)
-conn.outputStream.withWriter("UTF-8") { it.write(body) }
-
-def responseCode = conn.responseCode
-println "ServiceNow responded with [$responseCode]: ${conn.inputStream.text}"
+      - name: Run Groovy Script
+        run: groovy scripts/handle_issue.groovy payload.json
