@@ -5,20 +5,22 @@ on:
     types: [jira_issue_created]
 
 jobs:
-  handle-issue:
+  run-issue-handler:
     runs-on: ubuntu-latest
-    steps:
-      - name: Setup Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '17'
 
-      - name: Checkout repo
+    steps:
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Save Payload
-        run: echo '${{ toJson(github.event.client_payload) }}' > payload.json
+      - name: Set up Java (required for Groovy)
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+
+      - name: Install Groovy
+        run: |
+          sudo apt update
+          sudo apt install -y groovy
 
       - name: Run Groovy Script
         run: groovy handle_issue.groovy payload.json
