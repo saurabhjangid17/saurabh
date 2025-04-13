@@ -10,9 +10,6 @@ on:
         description: 'Jira Issue Type'
         required: true
 
-  repository_dispatch:
-    types: [jira_changelog_trigger]
-
 jobs:
   send-changelog:
     runs-on: ubuntu-latest
@@ -27,7 +24,7 @@ jobs:
           sdk: groovy
 
       - name: Run Groovy Script
-        run: groovy scripts/changelog_to_servicenow.groovy "${{ github.event.inputs.issue_key || github.event.client_payload.issue_key }}" "${{ github.event.inputs.issue_type || github.event.client_payload.issue_type }}"
+        run: groovy scripts/changelog_to_servicenow.groovy "${{ github.event.inputs.issue_key }}" "${{ github.event.inputs.issue_type }}"
         env:
           JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
           SERVICENOW_URL: ${{ secrets.SERVICENOW_URL }}
