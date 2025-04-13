@@ -25,6 +25,3 @@ jobs:
 
       - name: Run Groovy Script
         run: groovy scripts/changelog_to_servicenow.groovy "${{ github.event.inputs.issue_key }}" "${{ github.event.inputs.issue_type }}"
-        env:
-          JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
-          SERVICENOW_URL: ${{ secrets.SERVICENOW_URL }}
