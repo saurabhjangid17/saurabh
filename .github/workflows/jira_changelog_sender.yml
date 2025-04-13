@@ -1,0 +1,33 @@
+name: Jira Changelog Sender
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: 'Jira Issue Key'
+        required: true
+      issue_type:
+        description: 'Jira Issue Type'
+        required: true
+
+  repository_dispatch:
+    types: [jira_changelog_trigger]
+
+jobs:
+  send-changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Groovy
+        uses: sdkman/sdkman-action@v1
+        with:
+          sdk: groovy
+
+      - name: Run Groovy Script
+        run: groovy scripts/changelog_to_servicenow.groovy "${{ github.event.inputs.issue_key || github.event.client_payload.issue_key }}" "${{ github.event.inputs.issue_type || github.event.client_payload.issue_type }}"
+        env:
+          JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
+          SERVICENOW_URL: ${{ secrets.SERVICENOW_URL }}
