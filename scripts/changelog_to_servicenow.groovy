@@ -1,3 +1,10 @@
+#!/usr/bin/env groovy
+
+@Grab(group='org.codehaus.groovy.modules.http-builder', module='http-builder', version='0.7.1')
+@Grab(group='org.apache.httpcomponents', module='httpclient', version='4.5.13')
+@Grab(group='org.apache.httpcomponents', module='httpcore', version='4.4.13')
+@Grab(group='commons-logging', module='commons-logging', version='1.2')
+
 import groovy.json.JsonOutput
 import groovyx.net.http.RESTClient
 import groovyx.net.http.ContentType
@@ -11,23 +18,17 @@ def client = new RESTClient("${jiraUrl}/rest/api/3/issue/${issueKey}?expand=chan
 client.headers['Authorization'] = jiraCred
 client.headers['Accept'] = 'application/json'
 
-// Disable parsing response as JSON (for later POST)
-client.parser.'application/json' = client.parser.'text/plain'
-
 def response = client.get()
 def changelog = response.data.changelog
 def lastChange = changelog?.histories?.sort { it.created }?.last()
 
 def updatedFields = [:]
-
-// Extract only the "toString" values for changed fields
 lastChange?.items?.each { item ->
     if (item?.toString) {
         updatedFields[item.field] = item.toString
     }
 }
 
-// Only send if there are actual field updates
 if (!updatedFields.isEmpty()) {
     def payload = [
         event : "issue_updated",
@@ -37,7 +38,6 @@ if (!updatedFields.isEmpty()) {
 
     println "📦 Final Payload:\n" + JsonOutput.prettyPrint(JsonOutput.toJson(payload))
 
-    // POST to ServiceNow (assuming no auth required)
     def snow = new RESTClient('https://webhook-test.com/fafa7f2a39e39b5a6ed89cd99d890a0e')
     snow.headers['Content-Type'] = 'application/json'
     snow.parser.'application/json' = snow.parser.'text/plain'
