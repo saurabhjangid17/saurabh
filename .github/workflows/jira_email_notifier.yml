@@ -25,4 +25,5 @@ jobs:
           ISSUE_KEY: ${{ github.event.inputs.issue_key }}
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
         run: groovy scripts/EmailSender.groovy
