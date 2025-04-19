@@ -79,7 +79,7 @@ There is an open issue **${issueKey}**. Below are the details of the issue:
 **Project**: ${project}
 
 You can view the full details of the issue by clicking the following link:
-[${issueKey} - ${summary}](${JIRA_BASE_URL}/browse/${issueKey})
+[${issueKey} - ${summary}](https://atcisaurabhdemo.atlassian.net/browse/${issueKey})
 
 Thank you,  
 Jira
