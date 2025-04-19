@@ -22,5 +22,5 @@ jobs:
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
         run: |
-          curl -O https://raw.githubusercontent.com/<your-username>/<your-repo>/main/scripts/EmailSender.groovy
+          curl -O https://raw.githubusercontent.com/saurabhjangid17/saurabh/refs/heads/main/scripts/EmailSender.groovy
           groovy scripts/EmailSender.groovy
