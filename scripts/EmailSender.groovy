@@ -50,13 +50,11 @@ def recipients = []
 
 switch (groupKey) {
     case "Saurabh - Jangid":
+    case "Mohit - Sharma":
         recipients = ["saurabhjangidmatrix@gmail.com", "saurabh.jangid@accenture.com"]
         break
-    case "Mohit - Sharma":
-        recipients = ["saurabhjangidmatrix@gmail.com"]
-        break
     case "Rakhi - Suthar":
-        recipients = ["saurabh.jangid@accenture.com"]
+        recipients = ["saurabhjangidmatrix@gmail.com"]
         break
     default:
         println "⚠️ No recipients defined for assignment group: ${groupKey}"
