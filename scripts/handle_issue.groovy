@@ -70,7 +70,7 @@ def issueData = new JsonSlurper().parse(jiraConn.inputStream)
 def issueType = issueData.fields.issuetype.name
 def targetUrl
 
-if (issueType == "[System] Incident") {
+if (issueType == "Incident") {
     targetUrl = SERVICENOW_INCIDENT_URL
     targetAuth = incidentAuth
 } else if (issueType in ["[System] Service request", "[System] Service request with approvals"]) {
