@@ -70,10 +70,15 @@ def issueData = new JsonSlurper().parse(jiraConn.inputStream)
 def issueType = issueData.fields.issuetype.name
 def targetUrl
 
-if (issueType == "Incident") {
+if (issueType == "[System] Incident") {
     targetUrl = SERVICENOW_INCIDENT_URL
-} else {
+    targetAuth = incidentAuth
+} else if (issueType in ["[System] Service request", "[System] Service request with approvals"]) {
     targetUrl = SERVICENOW_REQUEST_URL
+    targetAuth = requestAuth
+} else {
+    println "Issue type [$issueType] is not supported for ServiceNow sync."
+    System.exit(1)  // Or handle differently if you want
 }
 
 // Step 3: Extract plain-text description, rebuild as ADF with one paragraph
