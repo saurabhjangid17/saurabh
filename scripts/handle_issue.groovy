@@ -55,7 +55,7 @@ def issueKey = payload.issue_key
 def jiraAuth = "Basic c2F1cmFiaGphbmdpZG1hdHJpeEBnbWFpbC5jb206QVRBVFQzeEZmR0YwZWFMcXd5ZlpfdVBSb1F1T0NYVzFTLXBqUXJ2blBlZWZFVFVWSUg1WjNUUTFYYzFnVHdNb2NRelRBSVJ6cHp6QmtiSmMzdDhaLVFDTHVvcXgxSmV5N19rd1RZLUhhVUhSdUduTnRkNTFIWk53Y2xIU3ZFVUVmZ3RWQXQ1LUNOeWpEcmpLaUtmU2dKYTg5LVZ5UG9wRk12cWJQbVgzV2lDRy10b3h2cXhCcjZZPTE1QUVDRDI0"
 
 def JIRA_BASE_URL = 'https://atcisaurabhdemo.atlassian.net'
-def SERVICENOW_INCIDENT_URL = 'https://webhook-test.com/d9e68fb04aeeb7be5e0454b17db6612d'
+def SERVICENOW_INCIDENT_URL = 'https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7'
 def SERVICENOW_REQUEST_URL = 'https://webhook-test.com/224924fd6f28ff1056b57fa40a6bd7d6'
 
 // Step 1: Fetch issue data from Jira
@@ -72,10 +72,8 @@ def targetUrl
 
 if (issueType == "Incident") {
     targetUrl = SERVICENOW_INCIDENT_URL
-    targetAuth = incidentAuth
 } else if (issueType in ["[System] Service request", "[System] Service request with approvals"]) {
     targetUrl = SERVICENOW_REQUEST_URL
-    targetAuth = requestAuth
 } else {
     println "Issue type [$issueType] is not supported for ServiceNow sync."
     System.exit(1)  // Or handle differently if you want
