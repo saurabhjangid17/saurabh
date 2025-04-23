@@ -1,10 +1,58 @@
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 
+// Helper: Extract plain text from Jira ADF
+def extractPlainTextFromADF(adfNode) {
+    if (!adfNode) return ""
+    def result = ""
+
+    if (adfNode instanceof Map) {
+        if (adfNode.type == "text") {
+            result += adfNode.text
+        } else if (adfNode.type == "hardBreak") {
+            result += "\n"
+        } else if (adfNode.content) {
+            adfNode.content.each { child ->
+                result += extractPlainTextFromADF(child)
+            }
+            if (adfNode.type == "paragraph") {
+                result += "\n"
+            }
+        }
+    } else if (adfNode instanceof List) {
+        adfNode.each { child ->
+            result += extractPlainTextFromADF(child)
+        }
+    }
+
+    return result.trim()
+}
+
+// Helper: Rebuild ADF using one paragraph and entire plain-text content
+def buildSingleParagraphADF(String plainText) {
+    return [
+        type   : "doc",
+        version: 1,
+        content: [
+            [
+                type   : "paragraph",
+                content: [
+                    [
+                        type: "text",
+                        text: plainText.replaceAll("\r\n", "\n")  // Normalize line breaks
+                    ]
+                ]
+            ]
+        ]
+    ]
+}
+
 // Read the input payload
 def payload = new JsonSlurper().parse(new File(args[0]))
 def issueKey = payload.issue_key
-def jiraAuth = payload.jira_auth
+
+// Base64-encoded Basic Auth credentials (hardcoded)
+def jiraAuth = "Basic c2F1cmFiaGphbmdpZG1hdHJpeEBnbWFpbC5jb206QVRBVFQzeEZmR0YwWnprWVFLeE80alNSODdyeUcwM3U5dVpLS1BxWkJUa1hOc1VIc2pER3ZjcE5fNHIzd2dfVnJGRG5lY0lfSXhqODBoYkl0TDRhYTdISDVZc2FZVnQxa1hFaS0yQXlTVGwzMktTQUVWRExGUUZia3hSMUEweU1ZV0JPSlc2cTYtUEZTbHFSS2lTR2tnc21TSTZBdzhodlRxQ3dxRXJja3dmSzA0RnVCTkZXbk9JPUU3RUJBMDA3"
 
 def JIRA_BASE_URL = 'https://atcisaurabhdemo.atlassian.net'
 def SERVICENOW_INCIDENT_URL = 'https://webhook-test.com/d9e68fb04aeeb7be5e0454b17db6612d'
@@ -18,19 +66,30 @@ jiraConn.setRequestProperty("Accept", "application/json")
 
 def issueData = new JsonSlurper().parse(jiraConn.inputStream)
 
-// Step 2: Determine target URL based on issue type
+// Step 2: Determine target URL and auth based on issue type
 def issueType = issueData.fields.issuetype.name
-def targetUrl = issueType == "Incident" ? SERVICENOW_INCIDENT_URL : SERVICENOW_REQUEST_URL
+def targetUrl
 
-println "Issue [$issueKey] type is [$issueType] → Sending to [$targetUrl]"
+if (issueType == "Incident") {
+    targetUrl = SERVICENOW_INCIDENT_URL
+} else {
+    targetUrl = SERVICENOW_REQUEST_URL
+}
 
-// Step 3: Send the issue data to ServiceNow
+// Step 3: Extract plain-text description, rebuild as ADF with one paragraph
+def plainDescription = extractPlainTextFromADF(issueData.fields.description)
+def singleParagraphADF = buildSingleParagraphADF(plainDescription)
+issueData.fields.description = singleParagraphADF
+
+// Step 4: Prepare and send POST request to ServiceNow
 def conn = new URL(targetUrl).openConnection()
 conn.setRequestMethod("POST")
 conn.doOutput = true
 conn.setRequestProperty("Content-Type", "application/json")
 
 def body = JsonOutput.toJson(issueData)
+println "Payload being sent to ServiceNow:\n" + JsonOutput.prettyPrint(body)
+
 conn.outputStream.withWriter("UTF-8") { it.write(body) }
 
 def responseCode = conn.responseCode
