@@ -6,11 +6,13 @@ import groovyx.net.http.ContentType
 import static groovyx.net.http.Method.*
 
 def ISSUE_KEY = args[0]
+def urgency = args[1]
+def impact = args[2]
 def JIRA_BASE_URL = "https://atcisaurabhdemo.atlassian.net"
 def JIRA_AUTH = System.getenv("JIRA_AUTH")
 
-if (!ISSUE_KEY || !JIRA_AUTH) {
-    println "❌ Missing issue key or JIRA_AUTH"
+if (!ISSUE_KEY || !urgency || !impact || !JIRA_AUTH) {
+    println "❌ Missing required input(s): issue key, urgency, impact or JIRA_AUTH"
     System.exit(1)
 }
 
@@ -31,40 +33,28 @@ def priorityMap = [
 
 // Matrix for Priority and Severity
 def matrix = [
-    "Critical-Extensive / Widespread"   : ["Highest", "Sev-1"],
-    "Critical-Significant / Large": ["Highest", "Sev-1"],
-    "Critical-Moderate / Limited"   : ["High",    "Sev-2"],
+    "Critical-Extensive / Widespread" : ["Highest", "Sev-1"],
+    "Critical-Significant / Large"    : ["Highest", "Sev-1"],
+    "Critical-Moderate / Limited"     : ["High",    "Sev-2"],
     "Critical-Minor / Localized"      : ["High",    "Sev-2"],
-    "High-Extensive / Widespread"      : ["Highest", "Sev-1"],
-    "High-Significant / Large"    : ["High",    "Sev-2"],
-    "High-Moderate / Limited"       : ["High",    "Sev-2"],
+    "High-Extensive / Widespread"     : ["Highest", "Sev-1"],
+    "High-Significant / Large"        : ["High",    "Sev-2"],
+    "High-Moderate / Limited"         : ["High",    "Sev-2"],
     "High-Minor / Localized"          : ["Medium",  "Sev-3"],
-    "Medium-Extensive / Widespread"    : ["High",    "Sev-2"],
-    "Medium-Significant / Large"  : ["Medium",  "Sev-3"],
-    "Medium-Moderate / Limited"     : ["Medium",  "Sev-3"],
+    "Medium-Extensive / Widespread"   : ["High",    "Sev-2"],
+    "Medium-Significant / Large"      : ["Medium",  "Sev-3"],
+    "Medium-Moderate / Limited"       : ["Medium",  "Sev-3"],
     "Medium-Minor / Localized"        : ["Medium",  "Sev-3"],
-    "Low-Extensive / Widespread"       : ["Low",     "Sev-4"],
-    "Low-Significant / Large"     : ["Low",     "Sev-4"],
-    "Low-Moderate / Limited"        : ["Low",     "Sev-4"],
+    "Low-Extensive / Widespread"      : ["Low",     "Sev-4"],
+    "Low-Significant / Large"         : ["Low",     "Sev-4"],
+    "Low-Moderate / Limited"          : ["Low",     "Sev-4"],
     "Low-Minor / Localized"           : ["Low",     "Sev-4"]
 ]
 
-// Step 1: Fetch issue
-def response = client.get(path: "/rest/api/2/issue/${ISSUE_KEY}")
-def fields = response.data.fields
-
-def urgency = fields.customfield_10045?.value
-def impact  = fields.customfield_10004?.value
-
-println "ℹ️  Issue: ${ISSUE_KEY}, Urgency: ${urgency}, Impact: ${impact}"
-
-if (!urgency || !impact) {
-    println "❌ Urgency or Impact field is missing"
-    System.exit(1)
-}
-
 def combo = "${urgency}-${impact}"
 def result = matrix[combo]
+
+println "ℹ️  Issue: ${ISSUE_KEY}, Urgency: ${urgency}, Impact: ${impact}"
 
 if (!result) {
     println "❌ No matching Priority/Severity for combination: ${combo}"
@@ -76,7 +66,7 @@ def priorityId = priorityMap[priorityName]
 
 println "✅ Mapped Priority: ${priorityName} (ID: ${priorityId}), Severity: ${severityValue}"
 
-// Step 2: Update issue
+// Update Jira issue
 def updateBody = [
     fields: [
         priority         : [id: priorityId],
