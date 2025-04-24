@@ -31,22 +31,22 @@ def priorityMap = [
 
 // Matrix for Priority and Severity
 def matrix = [
-    "Critical-Extensive"   : ["Highest", "Sev-1"],
-    "Critical-Significant": ["Highest", "Sev-1"],
-    "Critical-Moderate"   : ["High",    "Sev-2"],
-    "Critical-Minor"      : ["High",    "Sev-2"],
-    "High-Extensive"      : ["Highest", "Sev-1"],
-    "High-Significant"    : ["High",    "Sev-2"],
-    "High-Moderate"       : ["High",    "Sev-2"],
-    "High-Minor"          : ["Medium",  "Sev-3"],
-    "Medium-Extensive"    : ["High",    "Sev-2"],
-    "Medium-Significant"  : ["Medium",  "Sev-3"],
-    "Medium-Moderate"     : ["Medium",  "Sev-3"],
-    "Medium-Minor"        : ["Medium",  "Sev-3"],
-    "Low-Extensive"       : ["Low",     "Sev-4"],
-    "Low-Significant"     : ["Low",     "Sev-4"],
-    "Low-Moderate"        : ["Low",     "Sev-4"],
-    "Low-Minor"           : ["Low",     "Sev-4"]
+    "Critical-Extensive / Widespread"   : ["Highest", "Sev-1"],
+    "Critical-Significant / Large": ["Highest", "Sev-1"],
+    "Critical-Moderate / Limited"   : ["High",    "Sev-2"],
+    "Critical-Minor / Localized"      : ["High",    "Sev-2"],
+    "High-Extensive / Widespread"      : ["Highest", "Sev-1"],
+    "High-Significant / Large"    : ["High",    "Sev-2"],
+    "High-Moderate / Limited"       : ["High",    "Sev-2"],
+    "High-Minor / Localized"          : ["Medium",  "Sev-3"],
+    "Medium-Extensive / Widespread"    : ["High",    "Sev-2"],
+    "Medium-Significant / Large"  : ["Medium",  "Sev-3"],
+    "Medium-Moderate / Limited"     : ["Medium",  "Sev-3"],
+    "Medium-Minor / Localized"        : ["Medium",  "Sev-3"],
+    "Low-Extensive / Widespread"       : ["Low",     "Sev-4"],
+    "Low-Significant / Large"     : ["Low",     "Sev-4"],
+    "Low-Moderate / Limited"        : ["Low",     "Sev-4"],
+    "Low-Minor / Localized"           : ["Low",     "Sev-4"]
 ]
 
 // Step 1: Fetch issue
