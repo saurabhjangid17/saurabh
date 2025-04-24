@@ -1,0 +1,27 @@
+name: Update Priority and Severity
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_key:
+        description: 'Jira Issue Key'
+        required: true
+
+jobs:
+  update-priority-severity:
+    runs-on: ubuntu-latest
+
+    env:
+      JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Groovy
+        run: |
+          sudo apt update
+          sudo apt install -y groovy
+
+      - name: Run Groovy script
+        run: groovy scripts/update_priority_severity.groovy "${{ github.event.inputs.issue_key }}"
