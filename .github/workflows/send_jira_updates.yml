@@ -20,4 +20,4 @@ jobs:
           JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
           ISSUE_KEYS: ${{ github.event.inputs.issue_keys }}
         run: |
-          groovy path/to/your_script.groovy
+          groovy scripts/send_update_payload.groovy
