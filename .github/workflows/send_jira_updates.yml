@@ -1,0 +1,23 @@
+name: Send Jira Updates to ServiceNow
+
+on:
+  workflow_dispatch: # or triggered from Jira
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Groovy
+        run: |
+          sudo apt update
+          sudo apt install -y groovy
+
+      - name: Run Groovy Script
+        env:
+          JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
+          ISSUE_KEYS: ${{ github.event.inputs.issue_keys }}
+        run: |
+          groovy path/to/your_script.groovy
