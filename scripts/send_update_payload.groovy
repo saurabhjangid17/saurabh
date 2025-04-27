@@ -4,12 +4,15 @@ import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 
 // ========== Configuration ==========
-def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
+// Hardcode the Jira URL here
+def jiraUrl = "https://atcisaurabhdemo.atlassian.net" // Ensure this is correctly initialized
+println "Jira URL: ${jiraUrl}"  // Debugging line to check if jiraUrl is being initialized properly
+
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
 def servicenowRequestUrl = "https://webhook-test.com/38ed89e877bf373619617df76366f4c9"
 def JIRA_AUTH = System.getenv("JIRA_AUTH")
 
-// ========== Inputs ==========
+// ========== Inputs ========== 
 def issueKeysInput = System.getenv("ISSUE_KEYS") // comma-separated issue keys
 if (!issueKeysInput) {
     println "No issue keys provided!"
