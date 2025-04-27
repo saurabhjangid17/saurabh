@@ -7,7 +7,7 @@ import groovy.json.JsonOutput
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
 def servicenowRequestUrl = "https://webhook-test.com/38ed89e877bf373619617df76366f4c9"
-def jiraAuth = System.getenv("JIRA_AUTH")
+def JIRA_AUTH = System.getenv("JIRA_AUTH")
 
 // ========== Inputs ==========
 def issueKeysInput = System.getenv("ISSUE_KEYS") // comma-separated issue keys
@@ -23,7 +23,7 @@ def issueKeys = issueKeysInput.split(",")
 def getFromJira(String path) {
     def url = new URL("${jiraUrl}${path}")
     def connection = url.openConnection()
-    connection.setRequestProperty("Authorization", "${jiraAuth}")
+    connection.setRequestProperty("Authorization", JIRA_AUTH)
     connection.setRequestProperty("Accept", "application/json")
     connection.connect()
     return new JsonSlurper().parse(connection.inputStream)
