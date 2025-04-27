@@ -1,7 +1,12 @@
 name: Send Jira Updates to ServiceNow
 
 on:
-  workflow_dispatch: # or triggered from Jira
+  workflow_dispatch:
+    inputs:
+      issue_keys:
+        description: 'Comma-separated issue keys'
+        required: true
+        type: string
 
 jobs:
   update:
