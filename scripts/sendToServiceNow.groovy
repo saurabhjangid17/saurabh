@@ -5,7 +5,7 @@ import groovy.json.JsonOutput
 import java.text.SimpleDateFormat
 
 // Define global constants
-def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
+def jiraUrl = "https://atcisaurabhdemo.atlassian.net"  // Ensure this is defined globally
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
 def servicenowRequestUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"
 
@@ -17,9 +17,9 @@ def issues = new JsonSlurper().parseText(issueData)
 
 issues.each { issue ->
     def issueKey = issue.key
-    def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
-    def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey)
-    def recentAttachments = getRecentAttachments(issueDetails.fields.attachment)
+    def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)  // Passing jiraUrl
+    def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey, jiraUrl)  // Passing jiraUrl
+    def recentAttachments = getRecentAttachments(issueDetails.fields.attachment, jiraUrl)  // Passing jiraUrl
 
     def payload = [
         event : recentComments.comments ? "comment_created" : "issue_created",
@@ -46,14 +46,14 @@ def fetchIssue(key, auth, jiraUrl) {
     return new JsonSlurper().parseText(response)
 }
 
-def getRecentComments(comments, issueKey) {
+def getRecentComments(comments, issueKey, jiraUrl) {
     def recent = []
     def now = new Date()
     comments.each { c ->
         def created = parseDate(c.created)
         if ((now.time - created.time) <= 30 * 60 * 1000) {
             // Fetch properties for each comment to determine the internal flag
-            def commentDetail = fetchCommentProperties(issueKey, c.id)
+            def commentDetail = fetchCommentProperties(issueKey, c.id, jiraUrl)  // Passing jiraUrl
             def internal = commentDetail?.internal ?: false
             recent << [
                 body       : extractTextFromADF(c.body),
@@ -67,7 +67,7 @@ def getRecentComments(comments, issueKey) {
     return [comments: recent]
 }
 
-def fetchCommentProperties(issueKey, commentId) {
+def fetchCommentProperties(issueKey, commentId, jiraUrl) {
     def conn = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}/comment/${commentId}?expand=properties").openConnection()
     conn.setRequestProperty("Authorization", "${jiraAuth}")
     conn.setRequestProperty("Accept", "application/json")
@@ -77,7 +77,7 @@ def fetchCommentProperties(issueKey, commentId) {
     return commentDetail?.properties?.find { it.key == "sd.public.comment" }?.value
 }
 
-def getRecentAttachments(attachments) {
+def getRecentAttachments(attachments, jiraUrl) {
     def recent = []
     def now = new Date()
     attachments.each { a ->
