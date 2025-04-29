@@ -103,7 +103,7 @@ def getRecentAttachments(attachments) {
 }
 
 def parseDate(dateStr) {
-    return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr.replaceAll(":(\d\d)\$", "\$1"))
+    return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr.replaceAll(/:(\d\d)$/, '$1'))
 }
 
 def extractTextFromADF(body) {
