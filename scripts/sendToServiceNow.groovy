@@ -39,7 +39,7 @@ issues.each { issue ->
 
 def fetchIssue(key, auth, jiraUrl) {
     def conn = new URL("${jiraUrl}/rest/api/3/issue/${key}?expand=renderedFields,changelog").openConnection()
-    conn.setRequestProperty("Authorization", "Basic ${auth}")
+    conn.setRequestProperty("Authorization", "${auth}")
     conn.setRequestProperty("Accept", "application/json")
     conn.connect()
     def response = conn.inputStream.text
@@ -69,7 +69,7 @@ def getRecentComments(comments, issueKey, jiraUrl, jiraAuth) {
 
 def fetchCommentProperties(issueKey, commentId, jiraUrl, jiraAuth) {
     def conn = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}/comment/${commentId}?expand=properties").openConnection()
-    conn.setRequestProperty("Authorization", "Basic ${jiraAuth}")
+    conn.setRequestProperty("Authorization", "${jiraAuth}")
     conn.setRequestProperty("Accept", "application/json")
     conn.connect()
     def response = conn.inputStream.text
