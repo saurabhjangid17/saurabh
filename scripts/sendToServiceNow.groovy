@@ -18,7 +18,7 @@ def issues = new JsonSlurper().parseText(issueData)
 issues.each { issue ->
     def issueKey = issue.key
     def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
-    def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey, jiraAuth, jiraUrl)
+    def recentComments = getRecentComments(issueKey, issueDetails.fields.comment.comments, jiraAuth, jiraUrl)
     def recentAttachments = getRecentAttachments(issueDetails.fields.attachment)
 
     def payload = [
@@ -39,27 +39,26 @@ issues.each { issue ->
 
 def fetchIssue(key, auth, jiraUrl) {
     def conn = new URL("${jiraUrl}/rest/api/3/issue/${key}?expand=renderedFields,changelog").openConnection()
-    conn.setRequestProperty("Authorization", "${auth}")
+    conn.setRequestProperty("Authorization", auth)
     conn.setRequestProperty("Accept", "application/json")
     conn.connect()
     def response = conn.inputStream.text
     return new JsonSlurper().parseText(response)
 }
 
-def getRecentComments(comments, issueKey, auth, jiraUrl) {
+def getRecentComments(issueKey, comments, auth, jiraUrl) {
     def recent = []
     def now = new Date()
     comments.each { c ->
         def created = parseDate(c.created)
         if ((now.time - created.time) <= 30 * 60 * 1000) {
-            def commentId = c.id
-            def internal = fetchInternalFlag(issueKey, commentId, auth, jiraUrl)
+            def internalFlag = fetchInternalFlag(issueKey, c.id, auth, jiraUrl)
             recent << [
                 body       : extractTextFromADF(c.body),
                 displayName: c.author?.displayName,
                 created    : c.created,
                 updated    : c.updated,
-                internal   : internal
+                internal   : internalFlag
             ]
         }
     }
@@ -74,6 +73,7 @@ def fetchInternalFlag(issueKey, commentId, auth, jiraUrl) {
         conn.setRequestProperty("Accept", "application/json")
         conn.connect()
         def response = conn.inputStream.text
+        println "Comment ${commentId} internal property: ${response}"
         def json = new JsonSlurper().parseText(response)
         return json.value?.internal ?: false
     } catch (Exception e) {
