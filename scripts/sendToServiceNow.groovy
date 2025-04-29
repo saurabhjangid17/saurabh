@@ -1,3 +1,10 @@
+#!/usr/bin/env groovy
+
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+import java.text.SimpleDateFormat
+import java.util.Date
+
 // Define global constants
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"  // Ensure this is defined globally
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
