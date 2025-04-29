@@ -1,0 +1,34 @@
+name: Send Issue Data to ServiceNow
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_keys:
+        description: 'Comma-separated Jira Issue Keys (example: DP-101,DP-102)'
+        required: true
+
+jobs:
+  send-to-servicenow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'  # Groovy requires Java 8 or later
+
+      - name: Install Groovy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y groovy
+
+      - name: Run Groovy script to send data to ServiceNow
+        env:
+          ISSUE_DATA: ${{ inputs.issue_keys }}
+          JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
+        run: |
+          echo "Starting Groovy script execution"
+          groovy scripts/sendToServiceNow.groovy
