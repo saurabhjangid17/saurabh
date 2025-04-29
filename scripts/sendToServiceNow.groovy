@@ -4,10 +4,10 @@ import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.text.SimpleDateFormat
 
-// Declare globally accessible variables
+// Define global constants
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
-def servicenowSrUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"
+def servicenowRequestUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"
 
 def issueData = System.getenv("ISSUE_DATA")
 def jiraAuth = System.getenv("JIRA_AUTH")
@@ -17,7 +17,7 @@ def issues = new JsonSlurper().parseText(issueData)
 
 issues.each { issue ->
     def issueKey = issue.key
-    def issueDetails = fetchIssue(issueKey, jiraAuth) // Make sure the fetchIssue method has access to jiraUrl
+    def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
     def recentComments = getRecentComments(issueDetails.fields.comment.comments)
     def recentAttachments = getRecentAttachments(issueDetails.fields.attachment)
 
@@ -31,14 +31,13 @@ issues.each { issue ->
     ]
 
     def issueType = issueDetails.fields.issuetype.name
-    def url = issueType == "Incident" ? servicenowIncidentUrl : servicenowSrUrl
+    def url = issueType == "Incident" ? servicenowIncidentUrl : servicenowRequestUrl
 
     println JsonOutput.prettyPrint(JsonOutput.toJson(payload))
     sendPayload(url, payload)
 }
 
-def fetchIssue(key, auth) {
-    // Ensure jiraUrl is used correctly here
+def fetchIssue(key, auth, jiraUrl) {
     def conn = new URL("${jiraUrl}/rest/api/3/issue/${key}?expand=renderedFields,changelog").openConnection()
     conn.setRequestProperty("Authorization", "Basic ${auth}")
     conn.setRequestProperty("Accept", "application/json")
