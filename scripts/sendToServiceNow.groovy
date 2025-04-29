@@ -1,70 +1,47 @@
-import groovy.json.JsonSlurper
-import groovy.json.JsonBuilder
-import java.text.SimpleDateFormat
-import java.util.TimeZone
+#!/usr/bin/env groovy
 
-// -----------------------
-// Global Configuration
-// -----------------------
+import groovy.json.JsonSlurper
+import groovy.json.JsonOutput
+import java.text.SimpleDateFormat
+
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
 def servicenowSrUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"
+
+def issueData = System.getenv("ISSUE_DATA")
 def jiraAuth = System.getenv("JIRA_AUTH")
 
-// -----------------------
-// Start Execution
-// -----------------------
-def jsonSlurper = new JsonSlurper()
-def issueData = System.getenv("ISSUE_DATA")
-def issues = jsonSlurper.parseText(issueData)
+println "Starting Groovy script execution"
+def issues = new JsonSlurper().parseText(issueData)
 
 issues.each { issue ->
     def issueKey = issue.key
-    println "Processing issue: ${issueKey}"
-
-    def issueJson = fetchIssue(issueKey, jiraUrl, jiraAuth)
-    def issueType = issueJson.fields.issuetype.name
-    def issueUrl = (issueType == "Incident") ? servicenowIncidentUrl : servicenowSrUrl
+    def issueDetails = fetchIssue(issueKey, jiraAuth)
+    def recentComments = getRecentComments(issueDetails.fields.comment.comments)
+    def recentAttachments = getRecentAttachments(issueDetails.fields.attachment)
 
     def payload = [
-        event: "issue_created",
-        key  : issueKey,
+        event : recentComments.comments ? "comment_created" : "issue_created",
+        key   : issueKey,
         fields: [
-            summary    : issueJson.fields.summary,
-            description: issueJson.fields.description,
-            priority   : issueJson.fields.priority?.name,
-            assignee   : issueJson.fields.assignee?.displayName ?: "Unassigned",
-            comment    : getRecentComments(issueJson.fields.comment?.comments ?: []),
-            attachments: getRecentAttachments(issueJson.fields.attachment ?: [])
+            comment   : recentComments,
+            attachment: recentAttachments
         ]
     ]
 
-    def connection = new URL(issueUrl).openConnection()
-    connection.setRequestMethod("POST")
-    connection.setRequestProperty("Content-Type", "application/json")
-    connection.setRequestProperty("Authorization", jiraAuth)
-    connection.setDoOutput(true)
-    connection.outputStream.write(new JsonBuilder(payload).toString().getBytes("UTF-8"))
-    connection.connect()
+    def issueType = issueDetails.fields.issuetype.name
+    def url = issueType == "Incident" ? serviceNowIncidentUrl : serviceNowRequestUrl
 
-    if (connection.responseCode == 200) {
-        println "Successfully sent ${issueKey} to ServiceNow"
-    } else {
-        println "Failed to send ${issueKey}. Status: ${connection.responseCode}"
-        println connection.errorStream.text
-    }
+    println JsonOutput.prettyPrint(JsonOutput.toJson(payload))
+    sendPayload(url, payload)
 }
 
-// -----------------------
-// Helper Methods
-// -----------------------
-
-def fetchIssue(String issueKey, String jiraUrl, String jiraAuth) {
-    def url = "${jiraUrl}/rest/api/3/issue/${issueKey}?expand=renderedFields"
-    def connection = new URL(url).openConnection()
-    connection.setRequestProperty("Authorization", jiraAuth)
-    connection.setRequestProperty("Accept", "application/json")
-    def response = connection.inputStream.text
+def fetchIssue(key, auth) {
+    def conn = new URL("${jiraUrl}/rest/api/3/issue/${key}?expand=renderedFields,changelog").openConnection()
+    conn.setRequestProperty("Authorization", "Basic ${auth}")
+    conn.setRequestProperty("Accept", "application/json")
+    conn.connect()
+    def response = conn.inputStream.text
     return new JsonSlurper().parseText(response)
 }
 
@@ -75,15 +52,15 @@ def getRecentComments(comments) {
         def created = parseDate(c.created)
         if ((now.time - created.time) <= 30 * 60 * 1000) {
             recent << [
-                body       : c.body,
+                body       : extractTextFromADF(c.body),
                 displayName: c.author?.displayName,
                 created    : c.created,
                 updated    : c.updated,
-                internal   : (c.public == false) ? true : false
+                internal   : c.internalComment ?: false
             ]
         }
     }
-    return recent
+    return [comments: recent]
 }
 
 def getRecentAttachments(attachments) {
@@ -104,8 +81,35 @@ def getRecentAttachments(attachments) {
     return recent
 }
 
-def parseDate(String dateStr) {
-    def df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
-    df.setTimeZone(TimeZone.getTimeZone("UTC"))
-    return df.parse(dateStr.replaceAll(":(?=\\d{2}\$)", "")) // Fix timezone colon
+def parseDate(dateStr) {
+    return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr.replaceAll(":(\\d\\d)\$", "\$1"))
+}
+
+def extractTextFromADF(body) {
+    if (!body || !body.content) return ""
+    return body.content.collect { extractTextRecursive(it) }.join("\n").trim()
+}
+
+def extractTextRecursive(node) {
+    def text = ""
+    if (node.type == "paragraph" && node.content) {
+        text += node.content.collect { it.text ?: "" }.join("")
+    } else if (node.content) {
+        text += node.content.collect { extractTextRecursive(it) }.join("")
+    }
+    return text
+}
+
+def sendPayload(url, payload) {
+    def conn = new URL(url).openConnection()
+    conn.setRequestMethod("POST")
+    conn.setDoOutput(true)
+    conn.setRequestProperty("Content-Type", "application/json")
+    conn.outputStream.withWriter { writer ->
+        writer << JsonOutput.toJson(payload)
+    }
+    def responseCode = conn.responseCode
+    def response = conn.inputStream.text
+    println "Response Code: $responseCode"
+    println "Response: $response"
 }
