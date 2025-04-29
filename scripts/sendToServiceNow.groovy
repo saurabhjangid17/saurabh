@@ -1,115 +1,101 @@
 import groovy.json.JsonSlurper
 import groovy.json.JsonBuilder
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.Duration
 
 // Hardcoded URLs
-def jiraUrl = "https://atcisaurabhdemo.atlassian.net"  // Your Jira URL
-def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"  // ServiceNow Incident URL
-def servicenowSrUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"  // ServiceNow Service Request URL
+def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
+def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
+def servicenowSrUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"
 
-// Fetch credentials and input from environment
 def jiraAuth = System.getenv("JIRA_AUTH")
-def issueData = System.getenv("ISSUE_DATA")  // Should be a JSON string like '[{"key": "DP-62"}, {"key": "DP-63"}]'
+def issueKeysJson = System.getenv("ISSUE_DATA")
 
 def jsonSlurper = new JsonSlurper()
-def issues = jsonSlurper.parseText(issueData)
+def issueKeys = jsonSlurper.parseText(issueKeysJson) // should be an array of strings like ["DP-62"]
 
-issues.each { issue ->
-    def issueKey = issue.key
-    println "Processing Issue: ${issueKey}"
+issueKeys.each { issueKey ->
+    def issue = fetchIssue(issueKey)
+    def comments = fetchJSMComments(issueKey)
+    def attachments = filterRecentAttachments(issue.fields.attachment)
 
-    // Fetch issue details from Jira
-    def connection = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}?expand=renderedFields").openConnection()
-    connection.setRequestMethod("GET")
-    connection.setRequestProperty("Authorization", jiraAuth)
-    connection.setRequestProperty("Content-Type", "application/json")
-    connection.connect()
+    def issueType = issue.fields.issuetype.name
+    def issueUrl = (issueType == "Incident") ? servicenowIncidentUrl : servicenowSrUrl
 
-    if (connection.responseCode != 200) {
-        println "Failed to fetch issue ${issueKey}. Response code: ${connection.responseCode}"
-        return
-    }
-
-    def issueDetails = new JsonSlurper().parse(connection.inputStream)
-
-    def issueType = issueDetails.fields.issuetype.name
-    def targetUrl = (issueType == "Incident") ? servicenowIncidentUrl : servicenowSrUrl
-
-    // Build payload
     def payload = [
-        event: "issue_created",
+        event: "comment_created",
         key: issueKey,
         fields: [
-            summary    : issueDetails.fields.summary,
-            description: issueDetails.fields.description,
-            priority   : issueDetails.fields.priority?.name ?: "Medium",
-            assignee   : issueDetails.fields.assignee?.displayName ?: "Unassigned",
-            comment    : getRecentComments(issueDetails.fields.comment.comments),
-            attachment : getRecentAttachments(issueDetails.fields.attachment)
+            comment: [
+                comments: comments
+            ],
+            attachment: attachments
         ]
     ]
 
-    // Send payload to ServiceNow
-    def postConnection = new URL(targetUrl).openConnection()
-    postConnection.setRequestMethod("POST")
-    postConnection.setRequestProperty("Authorization", jiraAuth)
-    postConnection.setRequestProperty("Content-Type", "application/json")
-    postConnection.setDoOutput(true)
+    sendToServiceNow(issueUrl, payload, issueKey)
+}
 
-    def payloadJson = new JsonBuilder(payload).toPrettyString()
-    postConnection.outputStream.write(payloadJson.getBytes("UTF-8"))
-    postConnection.connect()
+def fetchIssue(issueKey) {
+    def connection = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}?expand=renderedFields").openConnection()
+    connection.setRequestProperty("Authorization", jiraAuth)
+    connection.setRequestProperty("Accept", "application/json")
+    new JsonSlurper().parse(connection.inputStream)
+}
 
-    if (postConnection.responseCode == 200 || postConnection.responseCode == 201) {
-        println "Successfully sent payload for ${issueKey} to ServiceNow (${targetUrl})"
+def fetchJSMComments(issueKey) {
+    def connection = new URL("${jiraUrl}/rest/servicedeskapi/request/${issueKey}/comment").openConnection()
+    connection.setRequestProperty("Authorization", jiraAuth)
+    connection.setRequestProperty("Accept", "application/json")
+    def result = new JsonSlurper().parse(connection.inputStream)
+
+    def now = Instant.now()
+    def formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
+
+    result.comments.findAll { comment ->
+        def createdTime = Instant.parse(comment.created.replaceAll(/Z$/, "+0000"))
+        Duration.between(createdTime, now).toMinutes() <= 30
+    }.collect { comment ->
+        [
+            body       : comment.body,
+            displayName: comment.author.displayName,
+            created    : comment.created,
+            updated    : comment.updated,
+            internal   : !comment.public
+        ]
+    }
+}
+
+def filterRecentAttachments(attachments) {
+    def now = Instant.now()
+    attachments.findAll { att ->
+        def createdTime = Instant.parse(att.created)
+        Duration.between(createdTime, now).toMinutes() <= 30
+    }.collect { att ->
+        [
+            id      : att.id,
+            filename: att.filename,
+            mimeType: att.mimeType,
+            content : att.content,
+            created : att.created
+        ]
+    }
+}
+
+def sendToServiceNow(url, payload, issueKey) {
+    def connection = new URL(url).openConnection()
+    connection.setRequestMethod("POST")
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.setRequestProperty("Authorization", jiraAuth)
+    connection.setDoOutput(true)
+
+    connection.outputStream.write(new JsonBuilder(payload).toString().getBytes("UTF-8"))
+    connection.connect()
+
+    if (connection.responseCode == 200) {
+        println "Payload successfully sent to ${url} for issue ${issueKey}"
     } else {
-        println "Failed to send payload for ${issueKey} to ServiceNow. Response: ${postConnection.responseCode}"
+        println "Failed to send payload to ${url} for issue ${issueKey}. Response: ${connection.responseCode}"
     }
-}
-
-// -------- Helper functions --------
-
-// Helper: Filter comments created within last 30 minutes
-def getRecentComments(comments) {
-    def formattedComments = []
-    if (!comments) return formattedComments
-
-    def now = new Date()
-    def thirtyMinutesAgo = new Date(now.time - (30 * 60 * 1000)) // 30 minutes ago
-
-    comments.each { comment ->
-        def createdDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSSZ", comment.created)
-        if (createdDate.after(thirtyMinutesAgo)) {
-            formattedComments << [
-                body        : comment.body,
-                displayName : comment.author.displayName,
-                created     : comment.created,
-                updated     : comment.updated,
-                internal    : comment.internal
-            ]
-        }
-    }
-    return formattedComments
-}
-
-// Helper: Filter attachments created within last 30 minutes
-def getRecentAttachments(attachments) {
-    def formattedAttachments = []
-    if (!attachments) return formattedAttachments
-
-    def now = new Date()
-    def thirtyMinutesAgo = new Date(now.time - (30 * 60 * 1000))
-
-    attachments.each { att ->
-        def createdDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSSZ", att.created)
-        if (createdDate.after(thirtyMinutesAgo)) {
-            formattedAttachments << [
-                id      : att.id,
-                filename: att.filename,
-                mimeType: att.mimeType,
-                content : att.content,
-                created : att.created
-            ]
-        }
-    }
-    return formattedAttachments
 }
