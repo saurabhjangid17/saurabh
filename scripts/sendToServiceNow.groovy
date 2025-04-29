@@ -18,7 +18,7 @@ def issues = new JsonSlurper().parseText(issueData)
 issues.each { issue ->
     def issueKey = issue.key
     def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
-    def recentComments = getRecentCommentsWithInternalFlag(issueKey, issueDetails.fields.comment.comments, jiraAuth, jiraUrl)
+    def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey)
     def recentAttachments = getRecentAttachments(issueDetails.fields.attachment)
 
     def payload = [
@@ -46,38 +46,35 @@ def fetchIssue(key, auth, jiraUrl) {
     return new JsonSlurper().parseText(response)
 }
 
-def getRecentCommentsWithInternalFlag(issueKey, comments, auth, jiraUrl) {
+def getRecentComments(comments, issueKey) {
     def recent = []
     def now = new Date()
     comments.each { c ->
         def created = parseDate(c.created)
         if ((now.time - created.time) <= 30 * 60 * 1000) {
-            def commentId = c.id
-            def internal = false
-            try {
-                def propConn = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}/comment/${commentId}?expand=properties").openConnection()
-                propConn.setRequestProperty("Authorization", "${auth}")
-                propConn.setRequestProperty("Accept", "application/json")
-                propConn.connect()
-                def response = new JsonSlurper().parseText(propConn.inputStream.text)
-                internal = response.properties?."sd.public.comment"?.internal ?: false
-            } catch (Exception e) {
-                println "Failed to fetch comment property for commentId=${commentId}: ${e.message}"
-            }
-
-            def plainBody = extractTextFromADF(c.body)
-            if (plainBody?.trim()) {
-                recent << [
-                    body       : plainBody,
-                    displayName: c.author?.displayName,
-                    created    : c.created,
-                    updated    : c.updated,
-                    internal   : internal
-                ]
-            }
+            // Fetch properties for each comment to determine the internal flag
+            def commentDetail = fetchCommentProperties(issueKey, c.id)
+            def internal = commentDetail?.internal ?: false
+            recent << [
+                body       : extractTextFromADF(c.body),
+                displayName: c.author?.displayName,
+                created    : c.created,
+                updated    : c.updated,
+                internal   : internal
+            ]
         }
     }
     return [comments: recent]
+}
+
+def fetchCommentProperties(issueKey, commentId) {
+    def conn = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}/comment/${commentId}?expand=properties").openConnection()
+    conn.setRequestProperty("Authorization", "${jiraAuth}")
+    conn.setRequestProperty("Accept", "application/json")
+    conn.connect()
+    def response = conn.inputStream.text
+    def commentDetail = new JsonSlurper().parseText(response)
+    return commentDetail?.properties?.find { it.key == "sd.public.comment" }?.value
 }
 
 def getRecentAttachments(attachments) {
@@ -122,7 +119,7 @@ def sendPayload(url, payload) {
     conn.setRequestMethod("POST")
     conn.setDoOutput(true)
     conn.setRequestProperty("Content-Type", "application/json")
-    conn.outputStream.withWriter { writer ->
+    conn.outputStream.withWriter { writer -> 
         writer << JsonOutput.toJson(payload)
     }
     def responseCode = conn.responseCode
