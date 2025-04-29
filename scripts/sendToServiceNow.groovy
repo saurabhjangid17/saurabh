@@ -18,7 +18,7 @@ def issues = new JsonSlurper().parseText(issueData)
 issues.each { issue ->
     def issueKey = issue.key
     def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
-    def recentComments = getRecentComments(issueDetails.fields.comment.comments)
+    def recentComments = getRecentComments(issueKey, issueDetails.fields.comment.comments, jiraAuth, jiraUrl)
     def recentAttachments = getRecentAttachments(issueDetails.fields.attachment)
 
     def payload = [
@@ -46,22 +46,42 @@ def fetchIssue(key, auth, jiraUrl) {
     return new JsonSlurper().parseText(response)
 }
 
-def getRecentComments(comments) {
+def getRecentComments(issueKey, comments, auth, jiraUrl) {
     def recent = []
     def now = new Date()
     comments.each { c ->
         def created = parseDate(c.created)
         if ((now.time - created.time) <= 30 * 60 * 1000) {
+            def commentDetail = getCommentDetails(issueKey, c.id, auth, jiraUrl)
+            def isInternal = false
+            if (commentDetail?.status == 200 && commentDetail.body?.properties) {
+                def props = commentDetail.body.properties
+                def sdPublicCommentProp = props.find { it.key == "sd.public.comment" }
+                if (sdPublicCommentProp && sdPublicCommentProp.value instanceof Map) {
+                    isInternal = sdPublicCommentProp.value.internal == true
+                }
+            }
             recent << [
                 body       : extractTextFromADF(c.body),
                 displayName: c.author?.displayName,
                 created    : c.created,
                 updated    : c.updated,
-                internal   : c.internalComment ?: false
+                internal   : isInternal
             ]
         }
     }
     return [comments: recent]
+}
+
+def getCommentDetails(issueKey, commentId, auth, jiraUrl) {
+    def url = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}/comment/${commentId}/properties")
+    def conn = url.openConnection()
+    conn.setRequestProperty("Authorization", "${auth}")
+    conn.setRequestProperty("Accept", "application/json")
+    conn.connect()
+    def status = conn.responseCode
+    def responseBody = status == 200 ? new JsonSlurper().parseText(conn.inputStream.text) : null
+    return [status: status, body: responseBody]
 }
 
 def getRecentAttachments(attachments) {
@@ -83,7 +103,7 @@ def getRecentAttachments(attachments) {
 }
 
 def parseDate(dateStr) {
-    return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr.replaceAll(":(\\d\\d)\$", "\$1"))
+    return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr.replaceAll(":(\d\d)\$", "\$1"))
 }
 
 def extractTextFromADF(body) {
