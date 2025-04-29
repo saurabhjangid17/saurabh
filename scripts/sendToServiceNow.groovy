@@ -30,7 +30,7 @@ issues.each { issue ->
     ]
 
     def issueType = issueDetails.fields.issuetype.name
-    def url = issueType == "Incident" ? serviceNowIncidentUrl : serviceNowRequestUrl
+    def url = issueType == "Incident" ? servicenowIncidentUrl : servicenowSrUrl
 
     println JsonOutput.prettyPrint(JsonOutput.toJson(payload))
     sendPayload(url, payload)
