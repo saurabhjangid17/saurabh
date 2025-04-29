@@ -1,107 +1,114 @@
 import groovy.json.JsonSlurper
 import groovy.json.JsonBuilder
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
-import java.time.ZoneOffset
 
 // Hardcoded URLs
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"  // Your Jira URL
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"  // ServiceNow Incident URL
 def servicenowSrUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"  // ServiceNow Service Request URL
 
-// Fetch the Jira authentication credentials from environment variables
-def jiraAuth = System.getenv("JIRA_AUTH")  // Jira credentials from GitHub Secrets
+// Fetch credentials and input from environment
+def jiraAuth = System.getenv("JIRA_AUTH")
+def issueData = System.getenv("ISSUE_DATA")  // Should be a JSON string like '[{"key": "DP-62"}, {"key": "DP-63"}]'
 
-// Parsing the input JSON data (issue data passed as environment variable)
 def jsonSlurper = new JsonSlurper()
-def issueData = System.getenv("ISSUE_DATA")  // The Jira issue data passed from GitHub Actions
 def issues = jsonSlurper.parseText(issueData)
 
-// Get the current UTC time and 30 min before
-def now = ZonedDateTime.now(ZoneOffset.UTC)
-def thirtyMinutesAgo = now.minusMinutes(30)
-
-// Iterate over the issues to process each one
 issues.each { issue ->
     def issueKey = issue.key
-    def issueType = issue.fields.issuetype.name
-    def issueUrl = ""
+    println "Processing Issue: ${issueKey}"
 
-    // Logic to choose the ServiceNow URL based on issue type
-    if (issueType == "Incident") {
-        issueUrl = servicenowIncidentUrl
-    } else {
-        issueUrl = servicenowSrUrl
+    // Fetch issue details from Jira
+    def connection = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}?expand=renderedFields").openConnection()
+    connection.setRequestMethod("GET")
+    connection.setRequestProperty("Authorization", jiraAuth)
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.connect()
+
+    if (connection.responseCode != 200) {
+        println "Failed to fetch issue ${issueKey}. Response code: ${connection.responseCode}"
+        return
     }
 
-    // Now build the payload
+    def issueDetails = new JsonSlurper().parse(connection.inputStream)
+
+    def issueType = issueDetails.fields.issuetype.name
+    def targetUrl = (issueType == "Incident") ? servicenowIncidentUrl : servicenowSrUrl
+
+    // Build payload
     def payload = [
         event: "issue_created",
         key: issueKey,
         fields: [
-            summary: issue.fields.summary,
-            description: issue.fields.description,
-            priority: issue.fields.priority.name,
-            assignee: issue.fields.assignee ? issue.fields.assignee.displayName : "Unassigned",
-            comment: getRecentComments(issue.fields.comment.comments),
-            attachments: getRecentAttachments(issue.fields.attachment)
+            summary    : issueDetails.fields.summary,
+            description: issueDetails.fields.description,
+            priority   : issueDetails.fields.priority?.name ?: "Medium",
+            assignee   : issueDetails.fields.assignee?.displayName ?: "Unassigned",
+            comment    : getRecentComments(issueDetails.fields.comment.comments),
+            attachment : getRecentAttachments(issueDetails.fields.attachment)
         ]
     ]
 
-    // Send the data to the appropriate ServiceNow URL based on issue type
-    def connection = new URL(issueUrl).openConnection()
-    connection.setRequestMethod("POST")
-    connection.setRequestProperty("Content-Type", "application/json")
-    connection.setRequestProperty("Authorization", jiraAuth)
-    connection.setDoOutput(true)
+    // Send payload to ServiceNow
+    def postConnection = new URL(targetUrl).openConnection()
+    postConnection.setRequestMethod("POST")
+    postConnection.setRequestProperty("Authorization", jiraAuth)
+    postConnection.setRequestProperty("Content-Type", "application/json")
+    postConnection.setDoOutput(true)
 
-    // Convert the payload to JSON and send it
-    connection.outputStream.write(new JsonBuilder(payload).toString().getBytes("UTF-8"))
-    connection.connect()
+    def payloadJson = new JsonBuilder(payload).toPrettyString()
+    postConnection.outputStream.write(payloadJson.getBytes("UTF-8"))
+    postConnection.connect()
 
-    // Check the response
-    if (connection.responseCode == 200) {
-        println "Payload successfully sent to ${issueUrl} for issue ${issueKey}"
+    if (postConnection.responseCode == 200 || postConnection.responseCode == 201) {
+        println "Successfully sent payload for ${issueKey} to ServiceNow (${targetUrl})"
     } else {
-        println "Failed to send payload to ${issueUrl} for issue ${issueKey}. Response code: ${connection.responseCode}"
+        println "Failed to send payload for ${issueKey} to ServiceNow. Response: ${postConnection.responseCode}"
     }
 }
 
-// Helper function to filter and format comments added in last 30 min
+// -------- Helper functions --------
+
+// Helper: Filter comments created within last 30 minutes
 def getRecentComments(comments) {
     def formattedComments = []
+    if (!comments) return formattedComments
+
+    def now = new Date()
+    def thirtyMinutesAgo = new Date(now.time - (30 * 60 * 1000)) // 30 minutes ago
+
     comments.each { comment ->
-        if (comment?.created) {
-            def createdTime = ZonedDateTime.parse(comment.created, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
-            if (createdTime.isAfter(thirtyMinutesAgo)) {
-                formattedComments << [
-                    body: comment.body,
-                    displayName: comment.author.displayName,
-                    created: comment.created,
-                    updated: comment.updated,
-                    internal: comment.internal
-                ]
-            }
+        def createdDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSSZ", comment.created)
+        if (createdDate.after(thirtyMinutesAgo)) {
+            formattedComments << [
+                body        : comment.body,
+                displayName : comment.author.displayName,
+                created     : comment.created,
+                updated     : comment.updated,
+                internal    : comment.internal
+            ]
         }
     }
     return formattedComments
 }
 
-// Helper function to filter and format attachments added in last 30 min
+// Helper: Filter attachments created within last 30 minutes
 def getRecentAttachments(attachments) {
     def formattedAttachments = []
+    if (!attachments) return formattedAttachments
+
+    def now = new Date()
+    def thirtyMinutesAgo = new Date(now.time - (30 * 60 * 1000))
+
     attachments.each { att ->
-        if (att?.created) {
-            def attCreated = ZonedDateTime.parse(att.created, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
-            if (attCreated.isAfter(thirtyMinutesAgo)) {
-                formattedAttachments << [
-                    id: att.id,
-                    filename: att.filename,
-                    mimeType: att.mimeType,
-                    content: att.content,
-                    created: att.created
-                ]
-            }
+        def createdDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss.SSSZ", att.created)
+        if (createdDate.after(thirtyMinutesAgo)) {
+            formattedAttachments << [
+                id      : att.id,
+                filename: att.filename,
+                mimeType: att.mimeType,
+                content : att.content,
+                created : att.created
+            ]
         }
     }
     return formattedAttachments
