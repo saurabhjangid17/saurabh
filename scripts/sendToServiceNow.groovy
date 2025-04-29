@@ -39,7 +39,7 @@ issues.each { issue ->
 
 def fetchIssue(key, auth, jiraUrl) {
     def conn = new URL("${jiraUrl}/rest/api/3/issue/${key}?expand=renderedFields,changelog").openConnection()
-    conn.setRequestProperty("Authorization", "Basic ${auth}")
+    conn.setRequestProperty("Authorization", "${auth}")
     conn.setRequestProperty("Accept", "application/json")
     conn.connect()
     def response = conn.inputStream.text
