@@ -4,22 +4,25 @@ import java.text.SimpleDateFormat
 import java.util.TimeZone
 
 // -----------------------
-// Configuration
+// Global Configuration
 // -----------------------
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
 def servicenowIncidentUrl = "https://webhook.site/4b6a8c55-a5db-4d1a-a351-7ddd90cc1dd7"
 def servicenowSrUrl = "https://webhook-test.com/4c334bbf5265c44d4e66049c1497144f"
 def jiraAuth = System.getenv("JIRA_AUTH")
 
-// Read issue data
+// -----------------------
+// Start Execution
+// -----------------------
 def jsonSlurper = new JsonSlurper()
 def issueData = System.getenv("ISSUE_DATA")
 def issues = jsonSlurper.parseText(issueData)
 
 issues.each { issue ->
     def issueKey = issue.key
-    def issueJson = fetchIssue(issueKey)
+    println "Processing issue: ${issueKey}"
 
+    def issueJson = fetchIssue(issueKey, jiraUrl, jiraAuth)
     def issueType = issueJson.fields.issuetype.name
     def issueUrl = (issueType == "Incident") ? servicenowIncidentUrl : servicenowSrUrl
 
@@ -56,12 +59,11 @@ issues.each { issue ->
 // Helper Methods
 // -----------------------
 
-def fetchIssue(String issueKey) {
+def fetchIssue(String issueKey, String jiraUrl, String jiraAuth) {
     def url = "${jiraUrl}/rest/api/3/issue/${issueKey}?expand=renderedFields"
     def connection = new URL(url).openConnection()
     connection.setRequestProperty("Authorization", jiraAuth)
     connection.setRequestProperty("Accept", "application/json")
-
     def response = connection.inputStream.text
     return new JsonSlurper().parseText(response)
 }
@@ -77,7 +79,7 @@ def getRecentComments(comments) {
                 displayName: c.author?.displayName,
                 created    : c.created,
                 updated    : c.updated,
-                internal   : c.public == false ? true : false
+                internal   : (c.public == false) ? true : false
             ]
         }
     }
@@ -105,5 +107,5 @@ def getRecentAttachments(attachments) {
 def parseDate(String dateStr) {
     def df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ")
     df.setTimeZone(TimeZone.getTimeZone("UTC"))
-    return df.parse(dateStr.replaceAll(":(?=\\d{2}\$)", "")) // Fixes timezone colon issue
+    return df.parse(dateStr.replaceAll(":(?=\\d{2}\$)", "")) // Fix timezone colon
 }
