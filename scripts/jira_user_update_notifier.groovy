@@ -65,21 +65,65 @@ def getAccountIdByEmail = { email ->
     return jsonResponse ? jsonResponse[0].accountId : null
 }
 
-// 🔹 Update assignee if email present
-if (assigneeEmail) {
-    def assigneeId = getAccountIdByEmail(assigneeEmail)
-    if (assigneeId) {
-        println "🔹 Assignee accountId: $assigneeId"
-        // Optional: Add logic to update assignee
+// === Function to update assignee ===
+def updateAssignee(issueKey, accountId) {
+    def url = "https://atcisaurabhdemo.atlassian.net/rest/api/3/issue/$issueKey/assignee"
+    def connection = new URL(url).openConnection()
+    connection.setRequestMethod("PUT")
+    connection.setRequestProperty("Authorization", System.getenv("JIRA_AUTH"))
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.doOutput = true
+
+    def payload = JsonOutput.toJson([accountId: accountId])
+    connection.outputStream.withWriter("UTF-8") { it.write(payload) }
+
+    if (connection.responseCode == 204) {
+        println "✅ Assignee updated successfully."
+    } else {
+        println "❌ Failed to update assignee. Response: ${connection.errorStream?.text}"
     }
 }
 
-// 🔹 Update reporter if email present
+// === Function to update reporter ===
+def updateReporter(issueKey, accountId) {
+    def url = "https://atcisaurabhdemo.atlassian.net/rest/api/3/issue/$issueKey"
+    def connection = new URL(url).openConnection()
+    connection.setRequestMethod("PUT")
+    connection.setRequestProperty("Authorization", System.getenv("JIRA_AUTH"))
+    connection.setRequestProperty("Content-Type", "application/json")
+    connection.doOutput = true
+
+    def payload = JsonOutput.toJson([
+        fields: [reporter: [id: accountId]]
+    ])
+    connection.outputStream.withWriter("UTF-8") { it.write(payload) }
+
+    if (connection.responseCode == 204) {
+        println "✅ Reporter updated successfully."
+    } else {
+        println "❌ Failed to update reporter. Response: ${connection.errorStream?.text}"
+    }
+}
+
+// === Update Assignee ===
+if (assigneeEmail) {
+    def assigneeAccountId = getAccountIdByEmail(assigneeEmail)
+    if (assigneeAccountId) {
+        println "🔹 Assignee accountId: $assigneeAccountId"
+        updateAssignee(issueKey, assigneeAccountId)
+    } else {
+        println "❌ Assignee email not found in Jira."
+    }
+}
+
+// === Update Reporter ===
 if (reporterEmail) {
-    def reporterId = getAccountIdByEmail(reporterEmail)
-    if (reporterId) {
-        println "🔹 Reporter accountId: $reporterId"
-        // Optional: Add logic to update reporter
+    def reporterAccountId = getAccountIdByEmail(reporterEmail)
+    if (reporterAccountId) {
+        println "🔹 Reporter accountId: $reporterAccountId"
+        updateReporter(issueKey, reporterAccountId)
+    } else {
+        println "❌ Reporter email not found in Jira."
     }
 }
 
