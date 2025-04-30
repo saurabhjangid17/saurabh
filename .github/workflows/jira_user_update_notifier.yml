@@ -1,14 +1,14 @@
-name: Jira User Update Notifier
+name: Send Email for Jira Issue
 
 on:
   workflow_dispatch:
     inputs:
       issue_data:
-        description: 'Issue data as JSON string'
+        description: 'Issue data as JSON string (e.g., [{"key": "DP-62"}])'
         required: true
 
 jobs:
-  sendToSNOW:
+  notify:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,9 +25,9 @@ jobs:
         run: sudo apt-get install -y groovy
 
       - name: Run Groovy Script
-        run: groovy scripts/jira_user_update_notifier.groovy
         env:
+          ISSUE_DATA: ${{ github.event.inputs.issue_data }}
           JIRA_AUTH: ${{ secrets.JIRA_AUTH }}
           SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          ISSUE_DATA: ${{ github.event.inputs.issue_data }}
+        run: groovy scripts/jira_user_update_notifier.groovy
