@@ -36,9 +36,7 @@ issue.changelog?.histories?.each { history ->
 }
     def updatedFields = [:]
     changelogItems.each { item ->
-        def fieldName = item.field
-        println "Changelog Item: ${item.field} - Old Value: ${item.oldValue} - New Value: ${item.newValue}" // Debugging changelog items
-        
+        def fieldName = item.field        
         switch (fieldName) {
             case "summary":
                 updatedFields.summary = issue.fields.summary
@@ -78,17 +76,28 @@ issue.changelog?.histories?.each { history ->
                     name: issue.fields.status?.name
                 ]
                 break
-            case "customfield_10066": // Cascading Field
-                updatedFields.customfield_10066 = [
-                    parent: issue.fields.customfield_10066?.value,
-                    child : issue.fields.customfield_10066?.child?.value
-                ]
-                break
-            case "customfield_10010": // Request Type
-                updatedFields.customfield_10010 = issue.fields.customfield_10010?.requestType ? [
-                    name: issue.fields.customfield_10010?.requestType?.name
-                ] : null
-                break
+            case "customfield_10066": // Assignment Group (Cascading)
+                    def parent = issue.fields.customfield_10066
+                    def child = parent?.child
+
+                    updatedFields.customfield_10066 = [
+                        value: parent?.value,
+                        id   : parent?.id ?: "",
+                        child: child ? [
+                            value: child?.value,
+                            id   : child?.id ?: ""
+                        ] : null
+                    ]
+                    break
+
+                case "requestType": // JSM Request Type
+                    def requestType = issue.fields.requestType
+                    updatedFields.customfield_10010 = [
+                        requestType: [
+                            name: requestType?.name ?: ""
+                        ]
+                    ]
+                    break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
