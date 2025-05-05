@@ -27,7 +27,13 @@ issueKeys.each { issueKey ->
         println "No recent field changes for ${issueKey}"
         return
     }
-
+    // Debug: Log all changelog items to see what is being captured
+issue.changelog?.histories?.each { history ->
+    println "History created: ${history.created}"
+    history.items.each { item ->
+        println "Field: ${item.field}, Old Value: ${item.oldValue}, New Value: ${item.newValue}"
+    }
+}
     def updatedFields = [:]
     changelogItems.each { item ->
         def fieldName = item.field
