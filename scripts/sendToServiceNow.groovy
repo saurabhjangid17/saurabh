@@ -62,12 +62,15 @@ issueKeys.each { issueKey ->
                 updatedFields["customfield_10051"] = wrapValue(issue.fields.customfield_10051)
                 break
             case "status":
-                updatedFields.status = issue.fields.status?.name
+                updatedFields.status = [
+                id  : issue.fields.status?.id,
+                name: issue.fields.status?.name
+                ] 
                 break
-            case "customfield_10108": // Cascading field - Assignment Group
+            case "customfield_10066": 
                 updatedFields.assignmentGroup = [
-                parent: issue.fields.customfield_10108?.value,
-                child: issue.fields.customfield_10108?.child?.value
+                parent: issue.fields.customfield_10066?.value,
+                child: issue.fields.customfield_10066?.child?.value
                 ]
                 break
             case "customfield_10010": // Request Type
@@ -79,6 +82,7 @@ issueKeys.each { issueKey ->
                 println "Ignoring unsupported field: ${fieldName}"
         }
     }
+    changelog.items.each { println "Changed field: ${it.field}" }
 
     if (!updatedFields.isEmpty()) {
         def payload = [
