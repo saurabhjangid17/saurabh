@@ -61,6 +61,20 @@ issueKeys.each { issueKey ->
             case "Severity":
                 updatedFields["customfield_10051"] = wrapValue(issue.fields.customfield_10051)
                 break
+            case "status":
+                updatedFields.status = issue.fields.status?.name
+                break
+            case "customfield_10108": // Cascading field - Assignment Group
+                updatedFields.assignmentGroup = [
+                parent: issue.fields.customfield_10108?.value,
+                child: issue.fields.customfield_10108?.child?.value
+                ]
+                break
+            case "customfield_10010": // Request Type
+                 updatedFields.requestType = [
+                 name: issue.fields.customfield_10010?.requestType?.name
+                ]
+                break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
