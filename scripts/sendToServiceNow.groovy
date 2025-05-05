@@ -5,10 +5,14 @@ import java.text.SimpleDateFormat
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
 def serviceNowUrl = "https://atcisaurabhdemo.atlassian.net"
 def jiraAuth = System.getenv("JIRA_AUTH")
-def issueKeys = System.getenv("ISSUE_KEYS")?.split(",")?.collect { it.trim() }
+def issueDataJson = System.getenv("ISSUE_DATA")
+if (!issueDataJson) throw new RuntimeException("Missing ISSUE_DATA!")
+
+def issueData = new JsonSlurper().parseText(issueDataJson)
+def issueKeys = issueData*.key
+if (!issueKeys || issueKeys.isEmpty()) throw new RuntimeException("No issue keys found in ISSUE_DATA!")
 
 if (!jiraAuth) throw new RuntimeException("Missing JIRA_AUTH!")
-if (!issueKeys) throw new RuntimeException("Missing ISSUE_KEYS!")
 
 issueKeys.each { issueKey ->
     def issue = fetchIssue(issueKey, jiraAuth, jiraUrl)
