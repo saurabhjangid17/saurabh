@@ -67,13 +67,13 @@ issueKeys.each { issueKey ->
                 name: issue.fields.status?.name
                 ] 
                 break
-            case "Area": 
+            case "customfield_10066": 
                 updatedFields.assignmentGroup = [
                 parent: issue.fields.customfield_10066?.value,
                 child: issue.fields.customfield_10066?.child?.value
                 ]
                 break
-            case "Request Type": // Request Type
+            case "customfield_10010": // Request Type
                  updatedFields.requestType = [
                  name: issue.fields.customfield_10010?.requestType?.name
                 ]
