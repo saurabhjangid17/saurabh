@@ -29,7 +29,8 @@ issueKeys.each { issueKey ->
     
     def updatedFields = [:]
     changelogItems.each { item ->
-        def fieldName = item.field        
+        def fieldName = item.field
+          println "Changelog field: ${item.field}"
         switch (fieldName) {
             case "summary":
                 updatedFields.summary = issue.fields.summary
