@@ -3,7 +3,7 @@ import groovy.json.JsonOutput
 import java.text.SimpleDateFormat
 
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
-def serviceNowUrl = "https://atcisaurabhdemo.atlassian.net"
+def serviceNowUrl = "https://webhook-test.com/ffda71125915222a89bccf3569f404b8"
 def jiraAuth = System.getenv("JIRA_AUTH")
 def issueDataJson = System.getenv("ISSUE_DATA")
 if (!issueDataJson) throw new RuntimeException("Missing ISSUE_DATA!")
