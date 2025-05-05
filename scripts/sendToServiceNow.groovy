@@ -70,27 +70,27 @@ issueKeys.each { issueKey ->
                     name: issue.fields.status?.name
                 ]
                 break
-           case "customfield_10066": // Area
-            def parent = issue.fields.customfield_10066
-            def child = parent?.child
+           case "Area": // Cascading select
+        def parent = issue.fields.customfield_10066
+        def child = parent?.child
 
-            updatedFields.customfield_10066 = [
-                value: parent?.value,
-                id   : parent?.id ?: "",
-                child: child ? [
-                    value: child?.value,
-                    id   : child?.id ?: ""
-                ] : null
+        updatedFields.customfield_10066 = [
+            value: parent?.value,
+            id   : parent?.id ?: "",
+            child: child ? [
+                value: child?.value,
+                id   : child?.id ?: ""
+            ] : null
+        ]
+        break
+    case "Request Type":
+        def requestType = issue.fields.customfield_10010
+        updatedFields.customfield_10010 = [
+            requestType: [
+                name: requestType?.name ?: ""
             ]
-            break
-        case "customfield_10010": // Request Type
-            def requestType = issue.fields.customfield_10010
-            updatedFields.customfield_10010 = [
-                requestType: [
-                    name: requestType?.name ?: ""
-                ]
-            ]
-            break
+        ]
+        break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
