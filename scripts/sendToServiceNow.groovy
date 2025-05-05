@@ -6,6 +6,7 @@ def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
 def serviceNowUrl = "https://webhook-test.com/ffda71125915222a89bccf3569f404b8"
 def jiraAuth = System.getenv("JIRA_AUTH")
 def issueDataJson = System.getenv("ISSUE_DATA")
+
 if (!issueDataJson) throw new RuntimeException("Missing ISSUE_DATA!")
 
 def issueData = new JsonSlurper().parseText(issueDataJson)
@@ -63,26 +64,25 @@ issueKeys.each { issueKey ->
                 break
             case "status":
                 updatedFields.status = [
-                id  : issue.fields.status?.id,
-                name: issue.fields.status?.name
-                ] 
+                    id  : issue.fields.status?.id,
+                    name: issue.fields.status?.name
+                ]
                 break
-            case "customfield_10066": 
+            case "customfield_10066":
                 updatedFields.customfield_10066 = [
-                parent: issue.fields.customfield_10066?.value,
-                child: issue.fields.customfield_10066?.child?.value
+                    parent: issue.fields.customfield_10066?.value,
+                    child : issue.fields.customfield_10066?.child?.value
                 ]
                 break
             case "customfield_10010": // Request Type
-                 updatedFields.customfield_10010 = [
-                 name: issue.fields.customfield_10010?.requestType?.name
-                ]
+                updatedFields.customfield_10010 = issue.fields.customfield_10010?.requestType ? [
+                    name: issue.fields.customfield_10010?.requestType?.name
+                ] : null
                 break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
     }
-    changelog.items.each { println "Changed field: ${it.field}" }
 
     if (!updatedFields.isEmpty()) {
         def payload = [
