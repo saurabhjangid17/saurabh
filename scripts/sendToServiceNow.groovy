@@ -70,21 +70,24 @@ issueKeys.each { issueKey ->
                     name: issue.fields.status?.name
                 ]
                 break
-            case "customfield_10066": // Assignment Group (Cascading)
+           case "customfield_10066": // Area
+            def parent = issue.fields.customfield_10066
+            def child = parent?.child
+
             updatedFields.customfield_10066 = [
-                value: issue.fields.customfield_10066?.value,
-                id   : issue.fields.customfield_10066?.id ?: "",
-                child: issue.fields.customfield_10066?.child ? [
-                    value: issue.fields.customfield_10066.child?.value,
-                    id   : issue.fields.customfield_10066.child?.id ?: ""
+                value: parent?.value,
+                id   : parent?.id ?: "",
+                child: child ? [
+                    value: child?.value,
+                    id   : child?.id ?: ""
                 ] : null
             ]
             break
-
-        case "requestType": // JSM Request Type
+        case "customfield_10010": // Request Type
+            def requestType = issue.fields.customfield_10010
             updatedFields.customfield_10010 = [
                 requestType: [
-                    name: issue.fields.requestType?.name ?: ""
+                    name: requestType?.name ?: ""
                 ]
             ]
             break
