@@ -17,6 +17,8 @@ if (!jiraAuth) throw new RuntimeException("Missing JIRA_AUTH!")
 
 issueKeys.each { issueKey ->
     def issue = fetchIssue(issueKey, jiraAuth, jiraUrl)
+    println "Issue Fields: ${issue.fields}"  // Debugging raw issue fields
+
     def changelogItems = issue.changelog?.histories?.findAll {
         isWithinLast30Minutes(it.created)
     }?.collectMany { it.items } ?: []
@@ -29,6 +31,8 @@ issueKeys.each { issueKey ->
     def updatedFields = [:]
     changelogItems.each { item ->
         def fieldName = item.field
+        println "Changelog Item: ${item.field} - Old Value: ${item.oldValue} - New Value: ${item.newValue}" // Debugging changelog items
+        
         switch (fieldName) {
             case "summary":
                 updatedFields.summary = issue.fields.summary
@@ -68,7 +72,7 @@ issueKeys.each { issueKey ->
                     name: issue.fields.status?.name
                 ]
                 break
-            case "customfield_10066":
+            case "customfield_10066": // Cascading Field
                 updatedFields.customfield_10066 = [
                     parent: issue.fields.customfield_10066?.value,
                     child : issue.fields.customfield_10066?.child?.value
