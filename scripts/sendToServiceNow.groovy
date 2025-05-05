@@ -17,7 +17,6 @@ if (!jiraAuth) throw new RuntimeException("Missing JIRA_AUTH!")
 
 issueKeys.each { issueKey ->
     def issue = fetchIssue(issueKey, jiraAuth, jiraUrl)
-    println "Issue Fields: ${issue.fields}"  // Debugging raw issue fields
 
     def changelogItems = issue.changelog?.histories?.findAll {
         isWithinLast30Minutes(it.created)
@@ -27,13 +26,7 @@ issueKeys.each { issueKey ->
         println "No recent field changes for ${issueKey}"
         return
     }
-    // Debug: Log all changelog items to see what is being captured
-issue.changelog?.histories?.each { history ->
-    println "History created: ${history.created}"
-    history.items.each { item ->
-        println "Field: ${item.field}, Old Value: ${item.oldValue}, New Value: ${item.newValue}"
-    }
-}
+    
     def updatedFields = [:]
     changelogItems.each { item ->
         def fieldName = item.field        
@@ -77,27 +70,23 @@ issue.changelog?.histories?.each { history ->
                 ]
                 break
             case "customfield_10066": // Assignment Group (Cascading)
-                    def parent = issue.fields.customfield_10066
-                    def child = parent?.child
+            updatedFields.customfield_10066 = [
+                value: issue.fields.customfield_10066?.value,
+                id   : issue.fields.customfield_10066?.id ?: "",
+                child: issue.fields.customfield_10066?.child ? [
+                    value: issue.fields.customfield_10066.child?.value,
+                    id   : issue.fields.customfield_10066.child?.id ?: ""
+                ] : null
+            ]
+            break
 
-                    updatedFields.customfield_10066 = [
-                        value: parent?.value,
-                        id   : parent?.id ?: "",
-                        child: child ? [
-                            value: child?.value,
-                            id   : child?.id ?: ""
-                        ] : null
-                    ]
-                    break
-
-                case "requestType": // JSM Request Type
-                    def requestType = issue.fields.requestType
-                    updatedFields.customfield_10010 = [
-                        requestType: [
-                            name: requestType?.name ?: ""
-                        ]
-                    ]
-                    break
+        case "requestType": // JSM Request Type
+            updatedFields.customfield_10010 = [
+                requestType: [
+                    name: issue.fields.requestType?.name ?: ""
+                ]
+            ]
+            break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
