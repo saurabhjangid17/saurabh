@@ -22,6 +22,7 @@ issues.each { issue ->
     def issueKey = issue.key
     def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
     def updatedFields = [:]
+    updatedFields["customfield_10051"] = wrapValue(issueDetails.fields.customfield_10051)
     def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey, jiraUrl, jiraAuth)
 	if (recentComments) {
     updatedFields.comment = recentComments
