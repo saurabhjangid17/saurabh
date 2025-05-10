@@ -24,9 +24,7 @@ issues.each { issue ->
     def updatedFields = [:]
     def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey, jiraUrl, jiraAuth)
 	if (recentComments) {
-    updatedFields.comment = [
-        comments: recentComments
-    ]
+    updatedFields.comment = recentComments
 }
     def recentAttachments = getRecentAttachments(issueDetails.fields.attachment, jiraUrl, jiraAuth)
     if (recentAttachments) {
