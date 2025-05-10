@@ -49,10 +49,13 @@ issues.each { issue ->
                 updatedFields.summary = issueDetails.fields.summary
                 break
             case "description":
-                updatedFields.description = flattenADF(issue.fields.description)
+                updatedFields.description = flattenADF(issueDetails.fields.description)
                 break
             case "priority":
                 updatedFields.priority = issueDetails.fields.priority
+                break
+	    case "resolution":
+                updatedFields.resolution = issueDetails.fields.resolution
                 break
             case "assignee":
                 updatedFields.assignee = issueDetails.fields.assignee ? [
