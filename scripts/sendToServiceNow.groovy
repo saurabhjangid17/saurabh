@@ -47,45 +47,45 @@ issues.each { issue ->
           println "Changelog field: ${item.field}"
         switch (fieldName) {
             case "summary":
-                updatedFields.summary = issue.fields.summary
+                updatedFields.summary = issueDetails.fields.summary
                 break
             case "description":
                 updatedFields.description = flattenADF(issue.fields.description)
                 break
             case "priority":
-                updatedFields.priority = issue.fields.priority
+                updatedFields.priority = issueDetails.fields.priority
                 break
             case "assignee":
-                updatedFields.assignee = issue.fields.assignee ? [
-                    accountId    : issue.fields.assignee.accountId,
-                    displayName  : issue.fields.assignee.displayName,
-                    emailAddress : issue.fields.assignee.emailAddress
+                updatedFields.assignee = issueDetails.fields.assignee ? [
+                    accountId    : issueDetails.fields.assignee.accountId,
+                    displayName  : issueDetails.fields.assignee.displayName,
+                    emailAddress : issueDetails.fields.assignee.emailAddress
                 ] : null
                 break
             case "reporter":
-                updatedFields.reporter = issue.fields.reporter ? [
-                    accountId    : issue.fields.reporter.accountId,
-                    displayName  : issue.fields.reporter.displayName,
-                    emailAddress : issue.fields.reporter.emailAddress
+                updatedFields.reporter = issueDetails.fields.reporter ? [
+                    accountId    : issueDetails.fields.reporter.accountId,
+                    displayName  : issueDetails.fields.reporter.displayName,
+                    emailAddress : issueDetails.fields.reporter.emailAddress
                 ] : null
                 break
             case "Impact":
-                updatedFields["customfield_10004"] = wrapValue(issue.fields.customfield_10004)
+                updatedFields["customfield_10004"] = wrapValue(issueDetails.fields.customfield_10004)
                 break
             case "Urgency":
-                updatedFields["customfield_10045"] = wrapValue(issue.fields.customfield_10045)
+                updatedFields["customfield_10045"] = wrapValue(issueDetails.fields.customfield_10045)
                 break
             case "Severity":
-                updatedFields["customfield_10051"] = wrapValue(issue.fields.customfield_10051)
+                updatedFields["customfield_10051"] = wrapValue(issueDetails.fields.customfield_10051)
                 break
             case "status":
                 updatedFields.status = [
-                    id  : issue.fields.status?.id,
-                    name: issue.fields.status?.name
+                    id  : issueDetails.fields.status?.id,
+                    name: issueDetails.fields.status?.name
                 ]
                 break
            case "Area": // Area
-            def parent = issue.fields.customfield_10066
+            def parent = issueDetails.fields.customfield_10066
             def child = parent?.child
 
             updatedFields.customfield_10066 = [
@@ -98,7 +98,7 @@ issues.each { issue ->
             ]
             break
         case "Request Type": // Request Type
-            def requestType = issue.fields.customfield_10010
+            def requestType = issueDetails.fields.customfield_10010
             updatedFields.customfield_10010 = [
                 requestType: [
                     name: requestType?.name ?: ""
