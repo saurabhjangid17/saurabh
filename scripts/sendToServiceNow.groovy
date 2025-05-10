@@ -1,24 +1,38 @@
-import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import java.text.SimpleDateFormat
 
+// Define global constants
 def jiraUrl = "https://atcisaurabhdemo.atlassian.net"
-def serviceNowUrl = "https://webhook-test.com/ffda71125915222a89bccf3569f404b8"
+def servicenowIncidentUrl = "https://webhook-test.com/d1b5ae4f3939f1a6efc10ac090f0e924"
+def servicenowRequestUrl = "https://webhook-test.com/d1b5ae4f3939f1a6efc10ac090f0e924"
+
+
+// Fetch JIRA_AUTH from environment variables
 def jiraAuth = System.getenv("JIRA_AUTH")
-def issueDataJson = System.getenv("ISSUE_DATA")
+if (!jiraAuth) {
+    throw new RuntimeException("JIRA_AUTH environment variable is not set!")
+}
 
-if (!issueDataJson) throw new RuntimeException("Missing ISSUE_DATA!")
+def issueData = System.getenv("ISSUE_DATA")
+println "Starting Groovy script execution"
+def issues = new JsonSlurper().parseText(issueData)
 
-def issueData = new JsonSlurper().parseText(issueDataJson)
-def issueKeys = issueData*.key
-if (!issueKeys || issueKeys.isEmpty()) throw new RuntimeException("No issue keys found in ISSUE_DATA!")
-
-if (!jiraAuth) throw new RuntimeException("Missing JIRA_AUTH!")
-
-issueKeys.each { issueKey ->
-    def issue = fetchIssue(issueKey, jiraAuth, jiraUrl)
-
-    def changelogItems = issue.changelog?.histories?.findAll {
+issues.each { issue ->
+    def issueKey = issue.key
+    def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
+    def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey, jiraUrl, jiraAuth)
+	if (recentComments) {
+    updatedFields.comment = [
+        comments: recentComments
+    ]
+}
+    def recentAttachments = getRecentAttachments(issueDetails.fields.attachment, jiraUrl, jiraAuth)
+    if (recentAttachments) {
+    updatedFields.attachment = recentAttachments
+}
+	def fields = issueDetails.fields
+	def changelogItems = issue.changelog?.histories?.findAll {
         isWithinLast30Minutes(it.created)
     }?.collectMany { it.items } ?: []
 
@@ -70,90 +84,117 @@ issueKeys.each { issueKey ->
                     name: issue.fields.status?.name
                 ]
                 break
-           case "Area": // Cascading select
-        def parent = issue.fields.customfield_10066
-        def child = parent?.child
+           case "Area": // Area
+            def parent = issue.fields.customfield_10066
+            def child = parent?.child
 
-        updatedFields.customfield_10066 = [
-            value: parent?.value,
-            id   : parent?.id ?: "",
-            child: child ? [
-                value: child?.value,
-                id   : child?.id ?: ""
-            ] : null
-        ]
-        break
-    case "Request Type":
-        def requestType = issue.fields.customfield_10010
-        updatedFields.customfield_10010 = [
-            requestType: [
-                name: requestType?.name ?: ""
+            updatedFields.customfield_10066 = [
+                value: parent?.value,
+                id   : parent?.id ?: "",
+                child: child ? [
+                    value: child?.value,
+                    id   : child?.id ?: ""
+                ] : null
             ]
-        ]
-        break
+            break
+        case "Request Type": // Request Type
+            def requestType = issue.fields.customfield_10010
+            updatedFields.customfield_10010 = [
+                requestType: [
+                    name: requestType?.name ?: ""
+                ]
+            ]
+            break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
     }
 
+
     if (!updatedFields.isEmpty()) {
         def payload = [
             event : "issue_updated",
             key   : issueKey,
-            fields: updatedFields
+            fields: updatedFields,
         ]
-        println JsonOutput.prettyPrint(JsonOutput.toJson(payload))
-        sendPayload(serviceNowUrl, payload)
+    def issueType = fields.issuetype.name
+    def (url) = issueType == "[System] Incident" ?
+        [servicenowIncidentUrl] :
+        [servicenowRequestUrl]
+
+    println JsonOutput.prettyPrint(JsonOutput.toJson(payload))
+    sendPayload(url, payload)
     }
 }
+  
+
 
 def fetchIssue(key, auth, jiraUrl) {
-    def url = "${jiraUrl}/rest/api/3/issue/${key}?expand=changelog"
-    def conn = new URL(url).openConnection()
+    def conn = new URL("${jiraUrl}/rest/api/3/issue/${key}?expand=renderedFields,changelog").openConnection()
     conn.setRequestProperty("Authorization", auth)
     conn.setRequestProperty("Accept", "application/json")
     conn.connect()
-    return new JsonSlurper().parseText(conn.inputStream.text)
+    def response = conn.inputStream.text
+    return new JsonSlurper().parseText(response)
 }
 
-def sendPayload(url, data) {
-    def conn = new URL(url).openConnection()
-    conn.setRequestMethod("POST")
-    conn.setDoOutput(true)
-    conn.setRequestProperty("Content-Type", "application/json")
-    def writer = new OutputStreamWriter(conn.outputStream)
-    writer.write(JsonOutput.toJson(data))
-    writer.flush()
-    writer.close()
-
-    def responseCode = conn.responseCode
-    def responseText = conn.inputStream.text
-    println "Sent to ServiceNow: ${responseCode}"
-    println responseText
-}
-
-def isWithinLast30Minutes(String isoDate) {
-    def created = parseDate(isoDate)
+def getRecentComments(comments, issueKey, jiraUrl, jiraAuth) {
+    def recent = []
     def now = new Date()
-    return (now.time - created.time) <= 30 * 60 * 1000
+    comments.each { c ->
+        def created = parseDate(c.created)
+        def updated = parseDate(c.updated)
+
+        if ((now.time - created.time) <= 30 * 60 * 1000 || (now.time - updated.time) <= 30 * 60 * 1000) {
+            def commentDetail = fetchCommentProperties(issueKey, c.id, jiraUrl, jiraAuth)
+            def internal = commentDetail?.internal ?: false
+            recent << [
+                body       : extractTextFromADF(c.body),
+                displayName: c.author?.displayName,
+                created    : c.created,
+                updated    : c.updated,
+                internal   : internal
+            ]
+        }
+    }
+    return [comments: recent]
+}
+
+def fetchCommentProperties(issueKey, commentId, jiraUrl, jiraAuth) {
+    def conn = new URL("${jiraUrl}/rest/api/3/issue/${issueKey}/comment/${commentId}?expand=properties").openConnection()
+    conn.setRequestProperty("Authorization", jiraAuth)
+    conn.setRequestProperty("Accept", "application/json")
+    conn.connect()
+    def response = conn.inputStream.text
+    def commentDetail = new JsonSlurper().parseText(response)
+    return commentDetail?.properties?.find { it.key == "sd.public.comment" }?.value
+}
+
+def getRecentAttachments(attachments, jiraUrl, jiraAuth) {
+    def recent = []
+    def now = new Date()
+    attachments.each { a ->
+
+        def created = parseDate(a.created)
+        if ((now.time - created.time) <= 30 * 60 * 1000) {
+            recent << [
+                id      : a.id,
+                filename: a.filename,
+                mimeType: a.mimeType,
+                content : a.content,
+                created : a.created
+            ]
+        }
+    }
+    return recent
 }
 
 def parseDate(dateStr) {
     return new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").parse(dateStr.replaceAll(/:(\d\d)$/, '$1'))
 }
 
-def flattenADF(adf) {
-    if (!adf?.content) return adf
-    def text = extractTextFromADF(adf).replaceAll("\\s+", " ").trim()
-    return [
-        type   : "doc",
-        version: 1,
-        content: [[type: "paragraph", content: [[type: "text", text: text]]]]
-    ]
-}
-
 def extractTextFromADF(body) {
-    if (!body?.content) return ""
+    if (!body || !body.content) return ""
     return body.content.collect { extractTextRecursive(it) }.join("\n").trim()
 }
 
@@ -165,6 +206,47 @@ def extractTextRecursive(node) {
         text += node.content.collect { extractTextRecursive(it) }.join("")
     }
     return text
+}
+
+def flattenADF(adf) {
+    if (!adf?.content) return adf
+    def flatText = extractTextFromADF(adf).replaceAll("\\s+", " ").trim()
+    return [
+        type   : "doc",
+        version: 1,
+        content: [
+            [
+                type   : "paragraph",
+                content: [
+                    [type: "text", text: flatText]
+                ]
+            ]
+        ]
+    ]
+}
+
+def sendPayload(url, payload) {
+    def conn = new URL(url).openConnection()
+    conn.setRequestMethod("POST")
+    conn.setDoOutput(true)
+    conn.setRequestProperty("Content-Type", "application/json")   
+    conn.outputStream.withWriter { writer ->
+        writer << JsonOutput.toJson(payload)
+    }
+    def responseCode = conn.responseCode
+    def response = conn.inputStream.text
+    println "Response Code: ${responseCode}"
+    println "Response: ${response}"
+}
+
+def isWithinLast30Minutes(String isoDate) {
+    def created = parseDate(isoDate)
+    def now = new Date()
+    return (now.time - created.time) <= 30 * 60 * 1000
+}
+
+def customField(String id) {
+    return "customfield_${id}"
 }
 
 def wrapValue(field) {
