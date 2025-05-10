@@ -95,14 +95,14 @@ issues.each { issue ->
                 ] : null
             ]
             break
-        case "Request Type": // Request Type
-            def requestType = issueDetails.fields.customfield_10010
-            updatedFields.customfield_10010 = [
-                requestType: [
-                    name: requestType?.name ?: ""
-                ]
-            ]
-            break
+        case "Request Type":
+    def requestType = issueDetails.fields.customfield_10010?.requestType
+    updatedFields.customfield_10010 = [
+        requestType: [
+            name: requestType?.name ?: ""
+        ]
+    ]
+    break
             default:
                 println "Ignoring unsupported field: ${fieldName}"
         }
