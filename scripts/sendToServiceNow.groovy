@@ -21,6 +21,7 @@ def issues = new JsonSlurper().parseText(issueData)
 issues.each { issue ->
     def issueKey = issue.key
     def issueDetails = fetchIssue(issueKey, jiraAuth, jiraUrl)
+    def updatedFields = [:]
     def recentComments = getRecentComments(issueDetails.fields.comment.comments, issueKey, jiraUrl, jiraAuth)
 	if (recentComments) {
     updatedFields.comment = [
@@ -41,7 +42,6 @@ issues.each { issue ->
         return
     }
     
-    def updatedFields = [:]
     changelogItems.each { item ->
         def fieldName = item.field
           println "Changelog field: ${item.field}"
