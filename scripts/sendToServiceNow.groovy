@@ -33,7 +33,7 @@ issues.each { issue ->
     updatedFields.attachment = recentAttachments
 }
 	def fields = issueDetails.fields
-	def changelogItems = issue.changelog?.histories?.findAll {
+	def changelogItems = issueDetails.changelog?.histories?.findAll {
         isWithinLast30Minutes(it.created)
     }?.collectMany { it.items } ?: []
 
